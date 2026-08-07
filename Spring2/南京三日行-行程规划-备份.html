@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="canvas:width" content="1200">
+<meta name="canvas:height" content="860">
+<title>南京三日行 · 行程规划</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+/* ===== Reset & Base ===== */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Inter","SF Pro Display",system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg-base);
+  color:var(--text-primary);
+  line-height:1.6;
+  font-feature-settings:"kern";
+  letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== Design Tokens ===== */
+:root{
+  /* Category Colors — Teal / Amber / Rose / Green */
+  --cat-scenic:#0d9488;        /* Teal — 景点 */
+  --cat-scenic-bg:#ccfbf1;
+  --cat-food:#d97706;          /* Amber — 美食 */
+  --cat-food-bg:#fef3c7;
+  --cat-culture:#be185d;       /* Rose — 文化 */
+  --cat-culture-bg:#fce7f3;
+  --cat-shopping:#15803d;      /* Green — 购物 */
+  --cat-shopping-bg:#d1fae5;
+
+  /* Brand Palette — Sky teal accent, warm neutral base */
+  --bg-base:#f6f9fc;
+  --text-primary:#1a1a2e;
+  --text-secondary:#64748b;
+  --text-muted:#94a3b8;
+  --accent:#0369a1;            /* Sky-700 */
+  --accent-light:#0ea5e9;
+  --accent-dark:#075985;
+  --surface:#ffffff;
+  --border:#e2e8f0;
+  --border-light:#f1f5f9;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg:0 12px 32px rgba(0,0,0,0.08);
+  --shadow-glow:0 8px 40px rgba(3,105,161,0.12);
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:16px;
+  --radius-xl:24px;
+  --radius-pill:50px;
+
+  /* Spacing tokens for Nudge controls */
+  --card-gap:14px;
+  --card-pad:16px;
+
+  /* JS-consumed hex aliases (synchronized with above tokens) */
+  --hex-scenic:#0d9488;
+  --hex-food:#d97706;
+  --hex-culture:#be185d;
+  --hex-shopping:#15803d;
+  --hex-accent:#0369a1;
+  --hex-white:#ffffff;
+  --hex-popup-text:#666666;
+
+  /* Gradient tints */
+  --bg-tint-1:#f8f9fc;
+  --bg-tint-2:#f0fdfa;
+  --bg-tint-3:#fdf2f8;
+  --bg-tint-4:#f6f9fc;
+}
+
+/* ===== Banner ===== */
+.banner{
+  position:relative;
+  overflow:hidden;
+  padding:56px 48px 48px;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 40%,rgba(13,148,136,0.07),transparent 60%),
+    radial-gradient(ellipse 70% 50% at 80% 30%,rgba(190,24,93,0.05),transparent 55%),
+    radial-gradient(ellipse 60% 40% at 50% 80%,rgba(21,128,61,0.04),transparent 50%),
+    linear-gradient(135deg,var(--bg-tint-1) 0%,var(--bg-tint-2) 30%,var(--bg-tint-3) 60%,var(--bg-tint-4) 100%);
+  border-bottom:1px solid var(--border-light);
+}
+.banner::after{
+  content:"";
+  position:absolute;
+  bottom:-1px;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(3,105,161,0.2),transparent);
+}
+.banner-inner{
+  max-width:1200px;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:32px;
+  flex-wrap:wrap;
+}
+.banner-center{
+  flex:1;
+  min-width:280px;
+}
+.banner-eyebrow{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  font-weight:500;
+  color:var(--accent);
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.banner-eyebrow-dot{
+  width:8px;height:8px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 4px rgba(3,105,161,0.15);
+}
+.banner h1{
+  font-size:clamp(36px,5vw,56px);
+  font-weight:700;
+  line-height:1.08;
+  letter-spacing:-0.03em;
+  background:linear-gradient(135deg,var(--text-primary) 0%,var(--accent) 40%,var(--cat-scenic) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  margin-bottom:10px;
+}
+.banner-subtitle{
+  font-size:18px;
+  color:var(--text-secondary);
+  font-weight:400;
+  letter-spacing:-0.01em;
+}
+/* Badges */
+.badges{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.badge{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-width:84px;
+  padding:16px 20px;
+  background:rgba(255,255,255,0.7);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.8);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-sm);
+  transition:transform 0.2s ease,box-shadow 0.2s ease;
+}
+.badge:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md);
+}
+.badge-value{
+  font-size:28px;
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-0.03em;
+  background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.badge-label{
+  font-size:12px;
+  font-weight:500;
+  color:var(--text-muted);
+  letter-spacing:0.02em;
+  margin-top:6px;
+}
+
+/* ===== Tabs ===== */
+.tabs-bar{
+  max-width:1200px;
+  margin:0 auto;
+  padding:24px 48px 0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.tab-btn{
+  appearance:none;
+  border:none;
+  background:transparent;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:0.02em;
+  color:var(--text-secondary);
+  padding:10px 24px;
+  border-radius:var(--radius-pill);
+  cursor:pointer;
+  transition:all 0.25s ease;
+  position:relative;
+}
+.tab-btn:hover{
+  background:var(--border-light);
+  color:var(--text-primary);
+}
+.tab-btn.active{
+  background:linear-gradient(135deg,var(--accent),var(--accent-dark));
+  color:var(--hex-white);
+  box-shadow:0 4px 14px rgba(3,105,161,0.3);
+}
+.tab-btn .tab-day{
+  font-size:11px;
+  opacity:0.7;
+  font-weight:500;
+}
+.tab-divider{
+  flex:1;
+  height:1px;
+  background:linear-gradient(90deg,var(--border),transparent);
+  margin-left:8px;
+}
+
+/* ===== Day Header ===== */
+.day-header{
+  max-width:1200px;
+  margin:0 auto;
+  padding:20px 48px 16px;
+}
+.day-header h2{
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:-0.02em;
+  color:var(--text-primary);
+  margin-bottom:6px;
+}
+.day-header p{
+  font-size:15px;
+  color:var(--text-secondary);
+}
+.day-stats{
+  display:flex;
+  gap:20px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+.day-stat{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:13px;
+  color:var(--text-secondary);
+  font-weight:500;
+}
+.day-stat-dot{
+  width:10px;height:10px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+.day-stat-cost{
+  margin-left:auto;
+  padding:6px 14px;
+  background:var(--cat-scenic-bg);
+  color:var(--cat-scenic);
+  border-radius:var(--radius-pill);
+  font-size:13px;
+  font-weight:600;
+}
+
+/* ===== Main Layout ===== */
+.main{
+  max-width:1200px;
+  margin:0 auto;
+  padding:0 48px 48px;
+  display:flex;
+  gap:24px;
+  align-items:flex-start;
+}
+
+/* ===== Timeline ===== */
+.timeline{
+  flex:0 0 42%;
+  min-width:340px;
+  position:relative;
+}
+.timeline::before{
+  content:"";
+  position:absolute;
+  left:31px;
+  top:16px;
+  bottom:16px;
+  width:2px;
+  background:linear-gradient(180deg,var(--border) 0%,var(--border) 50%,transparent 100%);
+}
+.timeline-card{
+  position:relative;
+  display:flex;
+  gap:16px;
+  margin-bottom:var(--card-gap);
+  cursor:pointer;
+  animation:fadeInUp 0.45s ease backwards;
+}
+@keyframes fadeInUp{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.timeline-time{
+  flex-shrink:0;
+  width:64px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  z-index:1;
+  padding-top:14px;
+}
+.timeline-time-text{
+  font-size:15px;
+  font-weight:700;
+  color:var(--text-primary);
+  letter-spacing:-0.01em;
+}
+.timeline-dot{
+  width:14px;height:14px;
+  border-radius:50%;
+  margin-top:8px;
+  border:3px solid var(--surface);
+  box-shadow:0 0 0 2px var(--border);
+  transition:all 0.25s ease;
+}
+.timeline-card:hover .timeline-dot{
+  transform:scale(1.3);
+  box-shadow:0 0 0 2px currentColor;
+}
+.timeline-card.active .timeline-dot{
+  transform:scale(1.4);
+  box-shadow:0 0 0 3px currentColor,0 0 12px rgba(3,105,161,0.3);
+}
+.timeline-card-body{
+  flex:1;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-left:4px solid var(--card-cat-color,var(--cat-scenic));
+  border-radius:var(--radius-md);
+  padding:var(--card-pad) 20px;
+  box-shadow:var(--shadow-sm);
+  transition:all 0.25s ease;
+}
+.timeline-card:hover .timeline-card-body{
+  box-shadow:var(--shadow-md);
+  transform:translateX(4px);
+}
+.timeline-card.active .timeline-card-body{
+  box-shadow:var(--shadow-lg);
+  border-color:var(--card-cat-color);
+  background:linear-gradient(135deg,var(--surface) 0%,var(--card-cat-bg,var(--cat-scenic-bg)) 100%);
+}
+.card-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:6px;
+}
+.card-name{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-primary);
+  letter-spacing:-0.01em;
+}
+.card-cat{
+  flex-shrink:0;
+  font-size:11px;
+  font-weight:600;
+  padding:3px 10px;
+  border-radius:var(--radius-pill);
+  background:var(--card-cat-bg);
+  color:var(--card-cat-color);
+  letter-spacing:0.02em;
+}
+.card-desc{
+  font-size:13.5px;
+  color:var(--text-secondary);
+  line-height:1.55;
+  margin-bottom:10px;
+}
+.card-meta{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  font-size:12px;
+  color:var(--text-muted);
+}
+.card-meta-item{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.card-meta-cost{
+  font-weight:700;
+  color:var(--card-cat-color);
+  font-size:13px;
+}
+
+/* ===== Map ===== */
+.map-wrapper{
+  flex:1;
+  position:sticky;
+  top:16px;
+  height:calc(100vh - 32px);
+  min-height:560px;
+  max-height:720px;
+  border-radius:var(--radius-lg);
+  overflow:hidden;
+  box-shadow:var(--shadow-lg),var(--shadow-glow);
+  border:1px solid var(--border);
+  background:var(--surface);
+}
+#map{
+  width:100%;
+  height:100%;
+  z-index:0;
+}
+.map-legend{
+  position:absolute;
+  bottom:16px;left:16px;
+  z-index:500;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(8px);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:10px 14px;
+  box-shadow:var(--shadow-sm);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  font-size:12px;
+}
+.legend-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:var(--text-secondary);
+  font-weight:500;
+}
+.legend-dot{
+  width:10px;height:10px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+/* ===== Custom Map Markers ===== */
+.custom-marker{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.marker-pin{
+  width:30px;height:30px;
+  border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid var(--hex-white);
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  transition:all 0.2s ease;
+}
+.marker-pin span{
+  transform:rotate(45deg);
+  font-size:13px;
+  font-weight:700;
+  color:var(--hex-white);
+}
+.custom-marker.active .marker-pin{
+  transform:rotate(-45deg) scale(1.25);
+  box-shadow:0 4px 16px rgba(0,0,0,0.25),0 0 0 4px rgba(255,255,255,0.5);
+}
+
+/* ===== Responsive ===== */
+@media(max-width:900px){
+  .banner{padding:36px 24px 28px}
+  .banner-inner{flex-direction:column;align-items:flex-start}
+  .badges{width:100%}
+  .tabs-bar,.day-header,.main{padding-left:24px;padding-right:24px}
+  .main{flex-direction:column}
+  .timeline{flex:none;width:100%;min-width:0}
+  .map-wrapper{position:relative;height:400px;max-height:400px;top:0}
+  .timeline::before{left:23px}
+  .timeline-time{width:48px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Banner ===== -->
+<header class="banner" data-component="hero-banner">
+  <div class="banner-inner">
+    <div class="banner-center">
+      <div class="banner-eyebrow">
+        <span class="banner-eyebrow-dot"></span>
+        3 Days in Nanjing
+      </div>
+      <h1>南京三日行</h1>
+      <p class="banner-subtitle">钟山风物 · 城墙烟火 · 大江东去</p>
+    </div>
+    <div class="badges">
+      <div class="badge">
+        <div class="badge-value">3</div>
+        <div class="badge-label">行程天数</div>
+      </div>
+      <div class="badge">
+        <div class="badge-value">21</div>
+        <div class="badge-label">POI 景点</div>
+      </div>
+      <div class="badge">
+        <div class="badge-value">¥1,380</div>
+        <div class="badge-label">人均预算</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Tabs ===== -->
+<nav class="tabs-bar" data-component="day-tabs">
+  <button class="tab-btn active" data-day="0">DAY 1</button>
+  <button class="tab-btn" data-day="1">DAY 2</button>
+  <button class="tab-btn" data-day="2">DAY 3</button>
+  <div class="tab-divider"></div>
+</nav>
+
+<!-- ===== Day Header ===== -->
+<div class="day-header" id="dayHeader" data-component="day-header">
+  <h2 id="dayTitle"></h2>
+  <p id="daySubtitle"></p>
+  <div class="day-stats" id="dayStats"></div>
+</div>
+
+<!-- ===== Main Content ===== -->
+<main class="main">
+  <div class="timeline" id="timeline" data-component="timeline-list"></div>
+  <div class="map-wrapper" data-component="map-view">
+    <div id="map"></div>
+    <div class="map-legend">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cat-scenic)"></span>景点</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cat-food)"></span>美食</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cat-culture)"></span>文化</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cat-shopping)"></span>购物</div>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ===== Trip Data ===== */
+const tripData = [
+  {
+    day: 1,
+    title: "钟山风物 · 民国印记",
+    subtitle: "紫金山麓 · 民国建筑 · 秦淮夜色",
+    pois: [
+      {
+        time: "09:00", name: "中山陵", category: "scenic",
+        desc: "孙中山先生陵寝，392 级台阶拾级而上，俯瞰紫金山南麓全景，气势恢宏。",
+        cost: 0, duration: "2 小时", lat: 32.0583, lng: 118.8460
+      },
+      {
+        time: "11:00", name: "明孝陵", category: "scenic",
+        desc: "明太祖朱元璋与马皇后合葬陵，世界文化遗产，神道石刻精美绝伦。",
+        cost: 70, duration: "1.5 小时", lat: 32.0557, lng: 118.8378
+      },
+      {
+        time: "12:30", name: "南京大牌档（中山门店）", category: "food",
+        desc: "地道南京民间菜，盐水鸭、狮子头、美龄粥，民国风情装修环境。",
+        cost: 80, duration: "1 小时", lat: 32.0492, lng: 118.8393
+      },
+      {
+        time: "14:30", name: "总统府", category: "culture",
+        desc: "中国近代史遗址博物馆，太平天国天王府旧址，民国总统府驻地。",
+        cost: 40, duration: "2 小时", lat: 32.0480, lng: 118.7990
+      },
+      {
+        time: "16:30", name: "1912 民国风情街", category: "shopping",
+        desc: "民国建筑群改造的时尚街区，文创小店、咖啡馆、手作工坊聚集。",
+        cost: 0, duration: "1.5 小时", lat: 32.0491, lng: 118.8008
+      },
+      {
+        time: "18:30", name: "鸡鸣汤包（太平门店）", category: "food",
+        desc: "南京汤包代表名店，皮薄馅鲜，菊叶汤包为招牌。",
+        cost: 40, duration: "1 小时", lat: 32.0520, lng: 118.7935
+      },
+      {
+        time: "20:00", name: "夫子庙 · 秦淮河夜游", category: "culture",
+        desc: "桨声灯影里的秦淮河，画舫夜游穿越千年烟火气。",
+        cost: 80, duration: "2 小时", lat: 32.0230, lng: 118.7890
+      }
+    ]
+  },
+  {
+    day: 2,
+    title: "城墙烟火 · 人文漫步",
+    subtitle: "玄武湖畔 · 南朝古寺 · 最美书店",
+    pois: [
+      {
+        time: "08:30", name: "玄武湖公园", category: "scenic",
+        desc: "中国最大皇家园林湖泊，五洲相连，晨光湖景如画。",
+        cost: 0, duration: "2 小时", lat: 32.0720, lng: 118.8060
+      },
+      {
+        time: "10:30", name: "鸡鸣寺", category: "culture",
+        desc: "南朝四百八十寺之首，春樱名所，黄墙黛瓦梵音袅袅。",
+        cost: 10, duration: "1 小时", lat: 32.0690, lng: 118.8020
+      },
+      {
+        time: "12:00", name: "李记清真馆（评事街）", category: "food",
+        desc: "百年清真老字号，牛肉锅贴外酥里嫩，牛肉汤鲜醇。",
+        cost: 50, duration: "1 小时", lat: 32.0220, lng: 118.7770
+      },
+      {
+        time: "14:00", name: "南京博物院", category: "culture",
+        desc: "中国三大博物馆之一，民国馆沉浸式还原老南京街景。",
+        cost: 0, duration: "2.5 小时", lat: 32.0370, lng: 118.8360
+      },
+      {
+        time: "16:30", name: "老门东历史街区", category: "shopping",
+        desc: "明清古街修复，手工艺人入驻，德云社、先锋书店分店。",
+        cost: 0, duration: "1.5 小时", lat: 32.0180, lng: 118.7820
+      },
+      {
+        time: "18:00", name: "小潘记鸭血粉丝汤", category: "food",
+        desc: "南京地标美食，鸭血嫩滑、粉丝筋道，一碗暖到心底。",
+        cost: 35, duration: "1 小时", lat: 32.0305, lng: 118.7885
+      },
+      {
+        time: "20:00", name: "先锋书店（五台山总店）", category: "culture",
+        desc: "地下车库改造的中国最美书店，穹顶十字架与书海。",
+        cost: 0, duration: "1.5 小时", lat: 32.0520, lng: 118.7780
+      }
+    ]
+  },
+  {
+    day: 3,
+    title: "大江东去 · 山水深游",
+    subtitle: "美龄宫苑 · 阅江楼上 · 微醺夜色",
+    pois: [
+      {
+        time: "09:00", name: "美龄宫", category: "scenic",
+        desc: "宋美龄旧居，俯瞰似翡翠项链，民国宫殿式建筑精粹。",
+        cost: 30, duration: "1.5 小时", lat: 32.0530, lng: 118.8490
+      },
+      {
+        time: "10:30", name: "中山陵音乐台", category: "scenic",
+        desc: "紫金山中半圆形音乐殿堂，白鸽群飞，林间回响。",
+        cost: 0, duration: "1 小时", lat: 32.0570, lng: 118.8430
+      },
+      {
+        time: "12:00", name: "芳婆糕团店（朝天宫）", category: "food",
+        desc: "南京早点名品，驴打滚、赤豆元宵、青团手作。",
+        cost: 25, duration: "1 小时", lat: 32.0400, lng: 118.7700
+      },
+      {
+        time: "14:00", name: "阅江楼 · 狮子山", category: "culture",
+        desc: "明城墙制高点，登楼览大江东去，郑和下西洋出发地。",
+        cost: 40, duration: "2 小时", lat: 32.0950, lng: 118.7400
+      },
+      {
+        time: "16:00", name: "长江大桥 · 玻璃栈道", category: "scenic",
+        desc: "长江第一桥，玻璃栈道俯瞰江面，壮阔波澜。",
+        cost: 20, duration: "1.5 小时", lat: 32.1000, lng: 118.7350
+      },
+      {
+        time: "18:30", name: "龙袍蟹黄汤包（桥北店）", category: "food",
+        desc: "蟹黄满溢的招牌汤包，秋季蟹黄最肥美。",
+        cost: 60, duration: "1 小时", lat: 32.0750, lng: 118.7450
+      },
+      {
+        time: "20:30", name: "1912 酒吧街 · 微醺夜生活", category: "culture",
+        desc: "民国建筑里的微醺夜生活，live house 与精酿酒吧。",
+        cost: 100, duration: "2 小时", lat: 32.0490, lng: 118.8010
+      }
+    ]
+  }
+];
+
+/* ===== Category Config ===== */
+const catConfig = {
+  scenic:   { label: "景点", color: "var(--cat-scenic)",   bg: "var(--cat-scenic-bg)" },
+  food:     { label: "美食", color: "var(--cat-food)",      bg: "var(--cat-food-bg)" },
+  culture:  { label: "文化", color: "var(--cat-culture)",   bg: "var(--cat-culture-bg)" },
+  shopping: { label: "购物", color: "var(--cat-shopping)",  bg: "var(--cat-shopping-bg)" }
+};
+
+/* ===== Map Init ===== */
+const map = L.map('map', {
+  zoomControl: true,
+  scrollWheelZoom: true,
+  attributionControl: false
+}).setView([32.0600, 118.8000], 12);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+let currentMarkers = [];
+let currentPolyline = null;
+let activeCardIndex = -1;
+
+/* ===== Render Functions ===== */
+const _cs = getComputedStyle(document.documentElement);
+const catHex = {
+  scenic:   _cs.getPropertyValue('--hex-scenic').trim(),
+  food:     _cs.getPropertyValue('--hex-food').trim(),
+  culture:  _cs.getPropertyValue('--hex-culture').trim(),
+  shopping: _cs.getPropertyValue('--hex-shopping').trim()
+};
+const polylineColor = _cs.getPropertyValue('--hex-accent').trim();
+
+function getCategoryHex(cat) {
+  return catHex[cat] || catHex.scenic;
+}
+
+function renderTimeline(dayIndex) {
+  const data = tripData[dayIndex];
+  const container = document.getElementById('timeline');
+  container.innerHTML = '';
+
+  data.pois.forEach((poi, i) => {
+    const cfg = catConfig[poi.category];
+    const card = document.createElement('div');
+    card.className = 'timeline-card';
+    card.style.setProperty('--card-cat-color', cfg.color);
+    card.style.setProperty('--card-cat-bg', cfg.bg);
+    card.style.animationDelay = (i * 0.06) + 's';
+    card.dataset.index = i;
+
+    const costText = poi.cost === 0 ? '免费' : `¥${poi.cost}`;
+
+    card.innerHTML = `
+      <div class="timeline-time">
+        <div class="timeline-time-text">${poi.time}</div>
+        <div class="timeline-dot" style="background:${cfg.color};color:${cfg.color}"></div>
+      </div>
+      <div class="timeline-card-body">
+        <div class="card-top">
+          <div class="card-name">${poi.name}</div>
+          <div class="card-cat">${cfg.label}</div>
+        </div>
+        <div class="card-desc">${poi.desc}</div>
+        <div class="card-meta">
+          <div class="card-meta-item">⏱ ${poi.duration}</div>
+          <div class="card-meta-item card-meta-cost">${costText}</div>
+        </div>
+      </div>
+    `;
+
+    card.addEventListener('click', () => {
+      setActiveCard(i);
+      map.flyTo([poi.lat, poi.lng], 15, { duration: 1.2 });
+    });
+
+    container.appendChild(card);
+  });
+}
+
+function renderMapMarkers(dayIndex) {
+  // Clear existing
+  currentMarkers.forEach(m => map.removeLayer(m));
+  currentMarkers = [];
+  if (currentPolyline) {
+    map.removeLayer(currentPolyline);
+    currentPolyline = null;
+  }
+
+  const data = tripData[dayIndex];
+  const latlngs = [];
+
+  data.pois.forEach((poi, i) => {
+    const color = getCategoryHex(poi.category);
+    const icon = L.divIcon({
+      className: 'custom-marker',
+      html: `<div class="marker-pin" style="background:${color}"><span>${i + 1}</span></div>`,
+      iconSize: [30, 42],
+      iconAnchor: [15, 42]
+    });
+
+    const marker = L.marker([poi.lat, poi.lng], { icon }).addTo(map);
+    marker.bindPopup(
+      `<div style="font-weight:700;font-size:14px;margin-bottom:4px">${poi.name}</div>` +
+      `<div style="font-size:12px;color:var(--hex-popup-text)">${poi.time} · ${catConfig[poi.category].label}</div>`
+    );
+    currentMarkers.push(marker);
+    latlngs.push([poi.lat, poi.lng]);
+  });
+
+  // Draw polyline
+  currentPolyline = L.polyline(latlngs, {
+    color: polylineColor,
+    weight: 3,
+    opacity: 0.5,
+    dashArray: '8 8',
+    lineJoin: 'round'
+  }).addTo(map);
+
+  // Fit bounds
+  map.fitBounds(latlngs, { padding: [50, 50] });
+}
+
+function setActiveCard(index) {
+  // Remove active from all cards
+  document.querySelectorAll('.timeline-card').forEach(c => c.classList.remove('active'));
+  // Remove active from all markers
+  document.querySelectorAll('.custom-marker').forEach(m => m.classList.remove('active'));
+
+  if (index >= 0) {
+    const cards = document.querySelectorAll('.timeline-card');
+    if (cards[index]) {
+      cards[index].classList.add('active');
+      cards[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    // Highlight marker
+    const markers = document.querySelectorAll('.custom-marker');
+    if (markers[index]) {
+      markers[index].classList.add('active');
+    }
+  }
+  activeCardIndex = index;
+}
+
+function renderDayHeader(dayIndex) {
+  const data = tripData[dayIndex];
+  document.getElementById('dayTitle').textContent = `Day ${data.day} · ${data.title}`;
+  document.getElementById('daySubtitle').textContent = data.subtitle;
+
+  // Count categories
+  const counts = { scenic: 0, food: 0, culture: 0, shopping: 0 };
+  let dayCost = 0;
+  data.pois.forEach(poi => {
+    counts[poi.category]++;
+    dayCost += poi.cost;
+  });
+
+  const statsContainer = document.getElementById('dayStats');
+  statsContainer.innerHTML = '';
+
+  Object.entries(counts).forEach(([cat, count]) => {
+    if (count > 0) {
+      const cfg = catConfig[cat];
+      const stat = document.createElement('div');
+      stat.className = 'day-stat';
+      stat.innerHTML = `<span class="day-stat-dot" style="background:${cfg.color}"></span>${count} ${cfg.label}`;
+      statsContainer.appendChild(stat);
+    }
+  });
+
+  const costStat = document.createElement('div');
+  costStat.className = 'day-stat-cost';
+  costStat.textContent = `当日花费 ¥${dayCost}`;
+  statsContainer.appendChild(costStat);
+}
+
+function switchDay(dayIndex) {
+  activeCardIndex = -1;
+  renderTimeline(dayIndex);
+  renderMapMarkers(dayIndex);
+  renderDayHeader(dayIndex);
+}
+
+/* ===== Event Listeners ===== */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const dayIndex = parseInt(btn.dataset.day);
+    switchDay(dayIndex);
+  });
+});
+
+/* ===== Initialize ===== */
+switchDay(0);
+</script>
+</body>
+</html>

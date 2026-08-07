@@ -1,0 +1,10 @@
+# 工具生成的报告与产物
+.qoder/
+
+# 其他代理工具的本地记忆/缓存
+.workbuddy/
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
