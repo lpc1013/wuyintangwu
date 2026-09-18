@@ -566,6 +566,32 @@ static func glow_texture() -> ImageTexture:
 	_glow_cache = ImageTexture.create_from_image(im)
 	return _glow_cache
 
+static var _steam_cache: ImageTexture
+const STEAM_SIZE := 48
+## 三团错开的软球叠成一朵：下面两团撑宽度、上面那团收口，轮廓是鼓的才像汽。
+## 每行 (中心x, 中心y, 半径, 强度)，都在 0..1 的单位画布里。
+const STEAM_LOBES := [
+	Vector4(0.37, 0.63, 0.31, 0.8),
+	Vector4(0.63, 0.54, 0.25, 0.72),
+	Vector4(0.48, 0.35, 0.2, 0.55),
+]
+
+## 一团水汽：同样只画白色和 alpha，浓淡与偏色都交给 modulate。
+static func steam_texture() -> ImageTexture:
+	if _steam_cache != null:
+		return _steam_cache
+	var im := Image.create(STEAM_SIZE, STEAM_SIZE, false, Image.FORMAT_RGBA8)
+	for y in STEAM_SIZE:
+		for x in STEAM_SIZE:
+			var a := 0.0
+			for l: Vector4 in STEAM_LOBES:
+				var d := Vector2(float(x) / STEAM_SIZE - l.x, float(y) / STEAM_SIZE - l.y).length() / l.z
+				if d < 1.0:
+					a += pow(1.0 - d, 1.8) * l.w
+			im.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
+	_steam_cache = ImageTexture.create_from_image(im)
+	return _steam_cache
+
 static func facility_texture(id: String) -> ImageTexture:
 	if not _facility_cache.has(id):
 		_facility_cache[id] = ImageTexture.create_from_image(make_facility(id))

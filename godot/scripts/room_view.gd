@@ -60,6 +60,17 @@ const COST_TINT := Color(1.0, 0.58, 0.5)
 ## 盖在客人之上（客人 z 跟脚边 y 走，最高约 512），又得让弹窗压得住它
 const FLOAT_Z := 900
 
+## 池面热气：一团从水面生出来，边往上飘边涨开、淡掉。浓淡由汤种的 steam 档决定，
+## 冰泉与茶席那档是 0——冷水冒热气会直接说错话，所以宁可不画。
+const STEAM_LIFE := 2.6
+const STEAM_RISE := 54.0
+## 每隔这么久（再按浓淡缩）撒一团：热汤约半秒一团，牛奶浴两秒一团
+const STEAM_INTERVAL := 0.62
+## 同屏十几团就够糊住汤面了，再多汤色都看不见
+const STEAM_MAX := 16
+const STEAM_ALPHA := 0.3
+const STEAM_TINT := Color(0.95, 0.96, 1.0)
+
 var pools: Array[Dictionary] = []
 var guests: Array[Node2D] = []
 var spawn_acc := 0.8
@@ -111,6 +122,11 @@ var prop_tap_taught := false
 var _bubble_left := 0.0
 ## 正在上飘的金币字：{node, from, t}
 var floats: Array[Dictionary] = []
+## 正在升腾的热气：{node, from, t, drift, rise, scale, spin, alpha}
+var steams: Array[Dictionary] = []
+## 会冒热气的池子下标（steam 档为 0 的不进来），与 _steam_acc 一一对应
+var steam_pools: Array[int] = []
+var _steam_acc: Array[float] = []
 
 func _ready() -> void:
 	cfg = GameManager.ROOMS.get(GameManager.current_room, {})
@@ -121,6 +137,7 @@ func _ready() -> void:
 	%RoomLabel.text = cfg.label
 	%LayoutOverlay.visible = false
 	_build_pools(cfg.pools, cfg.get("pool_types", []))
+	_build_steam()
 	_build_spawns(cfg.spawns)
 	_build_lots(cfg.get("lots", []))
 	_build_facilities()
@@ -248,6 +265,7 @@ func _process(delta: float) -> void:
 			%Toast.text = ""
 	if _bubble_left > 0.0:
 		_bubble_left -= delta
+	_update_steam(delta)
 	_update_floats(delta)
 	_update_clock()
 
@@ -280,6 +298,62 @@ func _update_floats(delta: float) -> void:
 		if k >= 1.0:
 			l.queue_free()
 			floats.remove_at(i)
+
+## 只有真冒热气的池子配计时器；初相随机错开，免得两口池同一帧一起喷一团。
+func _build_steam() -> void:
+	for pi in pools.size():
+		if GameData.pool_steam(String(pools[pi].type)) <= 0.0:
+			continue
+		steam_pools.append(pi)
+		_steam_acc.append(randf_range(0.0, STEAM_INTERVAL))
+
+## 撒一团热气：落在池面后半幅，越大越靠后越淡。
+func _spawn_steam(si: int, dens: float) -> void:
+	while steams.size() >= STEAM_MAX:
+		var oldest: Dictionary = steams.pop_front()
+		(oldest.node as Sprite2D).queue_free()
+	var rect: Rect2 = pools[steam_pools[si]].rect
+	var sp := Sprite2D.new()
+	sp.texture = PixelArt.steam_texture()
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	# 客人泡在汤里的那一档 z 就是脚边水面，比池子上沿大，所以热气只会糊在他们身后
+	sp.z_index = int(rect.position.y) - 1
+	add_child(sp)
+	steams.append({
+		"node": sp,
+		"from": Vector2(randf_range(rect.position.x + 18.0, rect.end.x - 18.0),
+				randf_range(rect.position.y + 4.0, rect.position.y + rect.size.y * 0.4)),
+		"t": 0.0,
+		"drift": randf_range(-26.0, 26.0),
+		"rise": randf_range(0.8, 1.3),
+		"scale": clampf(rect.size.y / 220.0, 0.34, 1.0) * randf_range(0.85, 1.25),
+		"spin": randf_range(-0.6, 0.6),
+		"alpha": STEAM_ALPHA * lerpf(0.5, 1.0, dens),
+	})
+
+func _update_steam(delta: float) -> void:
+	for si in steam_pools.size():
+		var dens: float = GameData.pool_steam(String(pools[steam_pools[si]].type))
+		_steam_acc[si] += delta * dens
+		if _steam_acc[si] >= STEAM_INTERVAL:
+			_steam_acc[si] = 0.0
+			_spawn_steam(si, dens)
+	for j in range(steams.size() - 1, -1, -1):
+		var s: Dictionary = steams[j]
+		s.t = float(s.t) + delta
+		var k := clampf(float(s.t) / STEAM_LIFE, 0.0, 1.0)
+		var sp: Sprite2D = s.node
+		# 横向偏移按 k² 加大：刚出水那一下是直着往上顶，快到顶才晃开
+		sp.position = (s.from as Vector2) + Vector2(float(s.drift) * k * k,
+				-STEAM_RISE * float(s.rise) * k)
+		var scl := lerpf(float(s.scale), float(s.scale) * 2.3, k)
+		sp.scale = Vector2(scl, scl)
+		sp.rotation = float(s.spin) * k
+		# 两端全透、中段最实，否则看着像一个往上爬的白点
+		sp.modulate = Color(STEAM_TINT, sin(k * PI) * float(s.alpha))
+		if k >= 1.0:
+			sp.queue_free()
+			steams.remove_at(j)
 
 func _build_pools(pool_rects: Array, _types: Array) -> void:
 	var tint := SEAT_TINT if GameManager.is_lounge(GameManager.current_room) else POOL_TINT

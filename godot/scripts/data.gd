@@ -145,30 +145,31 @@ const GAIT_OF := {
 }
 
 ## 汤种：cap 为池位容量，coin_gen 决定是否直接产币，daily_cap 为该汤种单日产币上限，solo 表示只接待一位
+## steam 只管画面：池面热气的浓淡（0..1），冰泉与不下水的坐席为 0
 const POOLS := {
 	"hot": {"name": "温泉池", "water": "#7fd4b8", "cap": 4, "coin_gen": true, "daily_cap": 240,
-		"eff": {"coin": 2, "joy": 1, "fame": 1, "relax": 3, "social": 1}},
+		"steam": 1.0, "eff": {"coin": 2, "joy": 1, "fame": 1, "relax": 3, "social": 1}},
 	"milk": {"name": "牛奶浴", "water": "#f7f0e0", "cap": 3, "coin_gen": true, "daily_cap": 180,
-		"eff": {"coin": 1, "joy": 3, "fame": 1, "relax": 2, "social": 2}},
+		"steam": 0.6, "eff": {"coin": 1, "joy": 3, "fame": 1, "relax": 2, "social": 2}},
 	"yuzu": {"name": "柚子汤", "water": "#ffd98a", "cap": 3, "coin_gen": true, "daily_cap": 160,
-		"eff": {"coin": 1, "joy": 2, "fame": 2, "relax": 2, "sign": 1}},
+		"steam": 0.85, "eff": {"coin": 1, "joy": 2, "fame": 2, "relax": 2, "sign": 1}},
 	"herb": {"name": "森林药汤", "water": "#6faf7a", "cap": 3, "coin_gen": false,
-		"eff": {"joy": 1, "fame": 1, "explore": 2, "relax": 2, "effcy": 1}},
+		"steam": 0.75, "eff": {"joy": 1, "fame": 1, "explore": 2, "relax": 2, "effcy": 1}},
 	"ice": {"name": "雪山冰泉", "water": "#9fd8ef", "cap": 3, "coin_gen": false,
-		"eff": {"joy": 1, "fame": 1, "explore": 2, "effcy": 2}},
+		"steam": 0.0, "eff": {"joy": 1, "fame": 1, "explore": 2, "effcy": 2}},
 	"sand": {"name": "沙漠砂浴", "water": "#e8b56b", "cap": 4, "coin_gen": true, "daily_cap": 260,
-		"eff": {"coin": 3, "joy": 1, "explore": 1, "relax": 1, "sign": 1}},
+		"steam": 0.0, "eff": {"coin": 3, "joy": 1, "explore": 1, "relax": 1, "sign": 1}},
 	"cyber": {"name": "赛博碳酸泉", "water": "#46e6d4", "cap": 4, "coin_gen": true, "daily_cap": 200,
-		"eff": {"joy": 2, "fame": 1, "relax": 1, "social": 1, "effcy": 2}},
+		"steam": 0.9, "eff": {"joy": 2, "fame": 1, "relax": 1, "social": 1, "effcy": 2}},
 	"moon": {"name": "月光露汤", "water": "#b9c8ff", "cap": 2, "coin_gen": false,
-		"eff": {"joy": 2, "fame": 3, "relax": 2, "sign": 2}},
+		"steam": 0.45, "eff": {"joy": 2, "fame": 3, "relax": 2, "sign": 2}},
 	"moss": {"name": "苔石独汤", "water": "#86b894", "cap": 1, "coin_gen": false, "solo": true,
-		"eff": {"joy": 1, "fame": 1, "explore": 1, "relax": 3}},
+		"steam": 0.55, "eff": {"joy": 1, "fame": 1, "explore": 1, "relax": 3}},
 	"stone": {"name": "青岩石泉", "water": "#9ad0c8", "cap": 3, "coin_gen": true, "daily_cap": 220,
-		"eff": {"coin": 2, "joy": 1, "fame": 1, "explore": 1, "relax": 2}},
+		"steam": 0.7, "eff": {"coin": 2, "joy": 1, "fame": 1, "explore": 1, "relax": 2}},
 	## 茶室榻榻米：不泡水的坐席，靠茶点产币，与温泉池各算各的额度
 	"tatami": {"name": "榻榻米茶席", "water": "", "cap": 4, "coin_gen": true, "daily_cap": 150,
-		"eff": {"coin": 1, "joy": 1, "relax": 2, "social": 2}},
+		"steam": 0.0, "eff": {"coin": 1, "joy": 1, "relax": 2, "social": 2}},
 }
 
 ## 设施：w/h 为精灵画布像素（显示时统一按 DISPLAY_SCALE 放大）
@@ -241,6 +242,10 @@ static func gait_of(species_id: String) -> Dictionary:
 
 static func pool(type_id: String) -> Dictionary:
 	return POOLS.get(type_id, {})
+
+## 池面热气浓淡：缺字段或写超界一律夹回 0..1，画面侧不必再判空
+static func pool_steam(type_id: String) -> float:
+	return clampf(float(pool(type_id).get("steam", 0.0)), 0.0, 1.0)
 
 static func facility(id: String) -> Dictionary:
 	return FACILITIES.get(id, {})
