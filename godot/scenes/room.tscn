@@ -1,0 +1,113 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/room_view.gd" id="1_script"]
+
+[node name="Room" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="BG" type="TextureRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="PoolAreas" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="SpawnPoints" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="LayoutOverlay" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TopBarBG" type="ColorRect" parent="HUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 40.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(0.09, 0.06, 0.13, 0.62)
+
+[node name="TopBar" type="HBoxContainer" parent="HUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 40.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="RoomLabel" type="Label" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "房间"
+
+[node name="ClockLabel" type="Label" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "第 1 天 09:20 上午"
+
+[node name="Spacer" type="Control" parent="HUD/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StarsLabel" type="Label" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "★ 0"
+
+[node name="CoinsLabel" type="Label" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "金币 0"
+
+[node name="LayoutHint" type="Label" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "F1 布局"
+
+[node name="BackButton" type="Button" parent="HUD/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "← 案内图"
+
+[node name="Toast" type="Label" parent="HUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -64.0
+offset_right = 240.0
+offset_bottom = -34.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+horizontal_alignment = 1
+text = ""
