@@ -548,6 +548,24 @@ const INDIGO := Color(0.24, 0.3, 0.52)
 
 static var _facility_cache := {}
 
+static var _glow_cache: ImageTexture
+const GLOW_SIZE := 96
+
+## 一盏灯的形状：中心最亮、按幂律衰减到边缘全透，画布上只有白色和 alpha。
+## 颜色留给 modulate 决定，灯笼的暖黄与水面的冷青共用同一张图。
+static func glow_texture() -> ImageTexture:
+	if _glow_cache != null:
+		return _glow_cache
+	var im := Image.create(GLOW_SIZE, GLOW_SIZE, false, Image.FORMAT_RGBA8)
+	var c := (GLOW_SIZE - 1) * 0.5
+	for y in GLOW_SIZE:
+		for x in GLOW_SIZE:
+			var d := Vector2(x - c, y - c).length() / (c + 1.0)
+			var a := 0.0 if d >= 1.0 else pow(1.0 - d, 2.6) * 1.35
+			im.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
+	_glow_cache = ImageTexture.create_from_image(im)
+	return _glow_cache
+
 static func facility_texture(id: String) -> ImageTexture:
 	if not _facility_cache.has(id):
 		_facility_cache[id] = ImageTexture.create_from_image(make_facility(id))

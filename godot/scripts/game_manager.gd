@@ -6,6 +6,7 @@ const TITLE_BG := "res://assets/bg/title.png"
 const MAP_BG := "res://assets/bg/map-gate.png"
 
 ## pools: 池区/功能区矩形（客人入座吸附区）；spawns: 客人出生点；map_anchor: 案内图上的入口按钮位置
+## lights: 背景里本来就画好的灯笼/壁灯心点，入夜从这些位置往外打暖光
 ## kind: onsen（默认，下水泡汤）| lounge（落座喝茶，客人换成盘坐姿态、停留更久）
 const ROOMS := {
 	"ooike": {
@@ -18,6 +19,8 @@ const ROOMS := {
 		"lots": [Rect2(304, 456, 144, 56), Rect2(560, 456, 144, 56),
 			Rect2(56, 328, 208, 36), Rect2(688, 328, 160, 36)],
 		"map_anchor": Vector2(140, 440),
+		"lights": [Vector2(28, 148), Vector2(101, 46), Vector2(150, 56),
+			Vector2(746, 56), Vector2(795, 46), Vector2(868, 148)],
 		"unlock_rep": 0,
 	},
 	"indoor": {
@@ -29,6 +32,7 @@ const ROOMS := {
 		# 洗漱凳排到了走廊边，只剩竹丛苔地一整块 + 右侧毛巾筐与木架之间一条石沿
 		"lots": [Rect2(0, 344, 96, 96), Rect2(800, 352, 96, 28)],
 		"map_anchor": Vector2(448, 235),
+		"lights": [Vector2(567, 50), Vector2(858, 141)],
 		"unlock_rep": 0,
 	},
 	"rotenburo": {
@@ -41,6 +45,7 @@ const ROOMS := {
 		"lots": [Rect2(330, 176, 340, 70), Rect2(600, 400, 296, 112),
 			Rect2(0, 400, 84, 112)],
 		"map_anchor": Vector2(448, 80),
+		"lights": [Vector2(227, 161), Vector2(288, 180)],
 		"unlock_rep": 25,
 	},
 	"ishiyu": {
@@ -53,6 +58,7 @@ const ROOMS := {
 		"lots": [Rect2(60, 250, 300, 110), Rect2(640, 400, 250, 110),
 			Rect2(784, 148, 112, 132)],
 		"map_anchor": Vector2(150, 300),
+		"lights": [Vector2(488, 113)],
 		"unlock_rep": 40,
 	},
 	"backyard": {
@@ -65,6 +71,7 @@ const ROOMS := {
 		"lots": [Rect2(300, 415, 320, 97), Rect2(760, 430, 136, 82),
 			Rect2(800, 212, 96, 96)],
 		"map_anchor": Vector2(690, 300),
+		"lights": [Vector2(572, 123), Vector2(843, 139), Vector2(877, 165)],
 		"unlock_rep": 55,
 	},
 	"chashitsu": {
@@ -80,6 +87,7 @@ const ROOMS := {
 		"lots": [Rect2(400, 300, 160, 210), Rect2(392, 456, 160, 56),
 			Rect2(0, 456, 112, 56)],
 		"map_anchor": Vector2(760, 440),
+		"lights": [Vector2(575, 56)],
 		"unlock_rep": 70,
 	},
 }
@@ -193,8 +201,20 @@ func period() -> Dictionary:
 func income_mult() -> float:
 	return float(period().income)
 
+## 夜罩强度：时段表里每档一个定值，直接取用会在整点「啪」地跳一档。
+## 改成在本档内朝下一档线性过渡，昼夜连成一条斜坡，灯光才跟得上天色。
+## 「深夜」那档跨 0 点（23→29），小时数落在 from 之前时要补满 24 再算进度。
 func night_light() -> float:
-	return float(period().light)
+	var idx := period_index()
+	var p: Dictionary = GameData.PERIODS[idx]
+	var q: Dictionary = GameData.PERIODS[(idx + 1) % GameData.PERIODS.size()]
+	var from := float(p.from)
+	var to := float(p.to)
+	var h := hour
+	if h < from:
+		h += 24.0
+	var t := clampf((h - from) / maxf(to - from, 1.0), 0.0, 1.0)
+	return lerpf(float(p.light), float(q.light), t)
 
 func clock_text() -> String:
 	var h := int(floor(hour))

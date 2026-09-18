@@ -11,6 +11,18 @@ const SPAWN_TINT := Color(1.0, 0.24, 0.71, 0.9)
 const LOT_TINT := Color(0.55, 0.95, 0.62, 0.2)
 const LOT_EDGE := Color(0.62, 1.0, 0.7, 0.85)
 const NIGHT_TINT := Color(0.06, 0.08, 0.22)
+## 夜罩把画面压蓝，暖光再把它焐回来：同一张径向衰减贴图，靠 modulate 分色
+const LAMP_GLOW := Color(1.0, 0.74, 0.4)
+const WATER_GLOW := Color(0.46, 0.8, 0.95)
+## 背景里那几盏灯笼只有十几像素宽，光晕再放一圈就要把整盏灯糊成白斑
+const LAMP_GLOW_SCALE := 2.0
+const LANTERN_GLOW_SCALE := 1.7
+## 灯光峰值不拉满：ADD 混合下 1.0 直接过曝，留出余量让火苗的抖动看得见
+const LAMP_GLOW_ALPHA := 0.62
+const WATER_GLOW_ALPHA := 0.24
+## 纸灯笼里的火苗不该是死的：整幅光按正弦轻轻抖，幅度小到不抢戏
+const FLICKER_AMPLITUDE := 0.09
+const FLICKER_SPEED := 3.4
 const SPAWN_INTERVAL := 1.5
 const MAX_GUESTS := 8
 const SLOT_MIN_WIDTH := 72.0
@@ -44,6 +56,12 @@ var guests: Array[Node2D] = []
 var spawn_acc := 0.8
 var cfg: Dictionary = {}
 var night_rect: ColorRect
+var night_layer: CanvasLayer
+var lamp_glows: Array[Sprite2D] = []
+var lantern_glows: Array[Sprite2D] = []
+var water_glows: Array[Sprite2D] = []
+var _glow_mat: CanvasItemMaterial
+var _glow_time := 0.0
 var _toast_left := 0.0
 var build_mode := false
 var build_id := ""
@@ -114,14 +132,91 @@ func _ready() -> void:
 	_update_hud()
 
 func _build_night_tint() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 5
-	add_child(layer)
+	night_layer = CanvasLayer.new()
+	night_layer.layer = 5
+	add_child(night_layer)
 	night_rect = ColorRect.new()
 	night_rect.size = GameManager.VIEWPORT_SIZE
 	night_rect.color = Color(NIGHT_TINT, 0.0)
 	night_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(night_rect)
+	night_layer.add_child(night_rect)
+	_build_glows()
+
+## 三处光源：背景里本来就画好的灯笼（ROOMS.lights）、玩家挂上墙的纸灯笼、
+## 以及汤面自己泛起来的那层光。全部排在夜罩之后，ADD 混合只加亮不遮挡，
+## 等于在被染蓝的画面上重新点火。
+func _build_glows() -> void:
+	for i in cfg.get("lights", []).size():
+		var pos: Vector2 = cfg["lights"][i]
+		var g := _make_glow(pos, LAMP_GLOW_SCALE, LAMP_GLOW)
+		g.set_meta("ph", float(i) * 1.7)
+		night_layer.add_child(g)
+		lamp_glows.append(g)
+	if not GameManager.is_lounge(GameManager.current_room):
+		for p: Dictionary in pools:
+			var rect: Rect2 = p.rect
+			var w := _make_glow(rect.get_center(), 1.0, WATER_GLOW)
+			var d := float(PixelArt.GLOW_SIZE)
+			w.scale = Vector2(rect.size.x / d * 1.1, rect.size.y / d * 1.9)
+			w.set_meta("ph", float(water_glows.size()) * 2.1)
+			night_layer.add_child(w)
+			water_glows.append(w)
+	_sync_lantern_glows()
+
+func _make_glow(pos: Vector2, scl: float, tint: Color) -> Sprite2D:
+	var g := Sprite2D.new()
+	g.texture = PixelArt.glow_texture()
+	g.position = pos
+	g.scale = Vector2(scl, scl)
+	g.modulate = tint
+	g.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	g.material = _glow_material()
+	return g
+
+func _glow_material() -> CanvasItemMaterial:
+	if _glow_mat == null:
+		_glow_mat = CanvasItemMaterial.new()
+		_glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return _glow_mat
+
+## 玩家挂的灯笼也要亮。增删之后整批重建：上限才 8 盏，
+## 比让一张光与一个设施精灵的数组永远对齐要省心。
+func _sync_lantern_glows() -> void:
+	for g: Sprite2D in lantern_glows:
+		if is_instance_valid(g):
+			g.queue_free()
+	lantern_glows.clear()
+	if night_layer == null:
+		return
+	var n := 0
+	for sp: Sprite2D in facility_nodes:
+		if not is_instance_valid(sp) or String(sp.get_meta("fid")) != "lantern":
+			continue
+		var g := _make_glow(sp.position + Vector2(0, -8), LANTERN_GLOW_SCALE, LAMP_GLOW)
+		g.set_meta("ph", float(n) * 2.3)
+		night_layer.add_child(g)
+		lantern_glows.append(g)
+		n += 1
+
+## 一盏灯从暗到亮跟着天色走：夜罩最深压到 0.48（乘 0.55 时深夜只比白天暗一成五，
+## 看着像黄昏），光按 1.6 倍提前拉满，免得天黑透了灯还只有一半力气。
+## 白天夜色为 0，光就彻底熄干净。
+func _update_night(light: float, delta: float) -> void:
+	night_rect.color = Color(NIGHT_TINT, light * 0.78)
+	_glow_time += delta
+	var base := clampf(light * 1.6, 0.0, 1.0)
+	for g: Sprite2D in lamp_glows:
+		_flicker(g, base)
+	for g: Sprite2D in lantern_glows:
+		_flicker(g, base)
+	for g: Sprite2D in water_glows:
+		var breathe := 1.0 + 0.18 * sin(_glow_time * 0.9 + float(g.get_meta("ph")))
+		g.modulate.a = clampf(base * WATER_GLOW_ALPHA * breathe, 0.0, 1.0)
+
+func _flicker(g: Sprite2D, base: float) -> void:
+	var wobble := 1.0 - FLICKER_AMPLITUDE + FLICKER_AMPLITUDE * sin(
+			_glow_time * FLICKER_SPEED + float(g.get_meta("ph")))
+	g.modulate.a = clampf(base * LAMP_GLOW_ALPHA * wobble, 0.0, 1.0)
 
 func _process(delta: float) -> void:
 	if cfg.is_empty():
@@ -135,7 +230,7 @@ func _process(delta: float) -> void:
 		spawn_acc = 0.0
 		_try_spawn()
 	if night_rect:
-		night_rect.color = Color(NIGHT_TINT, GameManager.night_light() * 0.55)
+		_update_night(GameManager.night_light(), delta)
 	if _toast_left > 0.0:
 		_toast_left -= delta
 		if _toast_left <= 0.0:
@@ -280,6 +375,7 @@ func _add_facility_node(id: String, pos: Vector2) -> void:
 	sp.set_meta("fid", id)
 	add_child(sp)
 	facility_nodes.append(sp)
+	_sync_lantern_glows()
 
 func _build_palette() -> void:
 	palette = PanelContainer.new()
@@ -413,6 +509,7 @@ func _try_demolish(pos: Vector2) -> bool:
 			facility_nodes.remove_at(i)
 			sp.queue_free()
 			break
+	_sync_lantern_glows()
 	_toast("已拆除，退回 %d 金币" % refund)
 	_update_hud()
 	_refresh_palette()
