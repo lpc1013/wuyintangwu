@@ -50,6 +50,15 @@ const STORY_QUEUE_MAX := 3
 const BUBBLE_SECONDS := 3.6
 ## 手指点客人的命中半径：精灵只有 32~38 宽，按脚边算会点十次中不了三次
 const GUEST_TAP_RADIUS := 44.0
+## 金币飘字：HUD 那个数字跳一下，玩家看不出钱是谁给的、这笔又花在了哪
+const FLOAT_SECONDS := 1.15
+const FLOAT_RISE := 36.0
+## 八位客人同时泡汤时进账很密，飘字叠成一片就没人看得清了
+const FLOAT_MAX := 7
+const INCOME_TINT := Color(1.0, 0.87, 0.42)
+const COST_TINT := Color(1.0, 0.58, 0.5)
+## 盖在客人之上（客人 z 跟脚边 y 走，最高约 512），又得让弹窗压得住它
+const FLOAT_Z := 900
 
 var pools: Array[Dictionary] = []
 var guests: Array[Node2D] = []
@@ -100,6 +109,8 @@ var _mail_open := -1
 ## 「空点家具有故事」这件事只教一次
 var prop_tap_taught := false
 var _bubble_left := 0.0
+## 正在上飘的金币字：{node, from, t}
+var floats: Array[Dictionary] = []
 
 func _ready() -> void:
 	cfg = GameManager.ROOMS.get(GameManager.current_room, {})
@@ -237,7 +248,38 @@ func _process(delta: float) -> void:
 			%Toast.text = ""
 	if _bubble_left > 0.0:
 		_bubble_left -= delta
+	_update_floats(delta)
 	_update_clock()
+
+## 冒一条金币字。落在 pos 上、朝上飘 FLOAT_RISE，尾段加速淡出。
+func _float_text(pos: Vector2, text: String, tint: Color) -> void:
+	while floats.size() >= FLOAT_MAX:
+		var oldest: Dictionary = floats.pop_front()
+		(oldest.node as Label).queue_free()
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", tint)
+	l.add_theme_color_override("font_outline_color", Color(0.12, 0.07, 0.16, 0.92))
+	l.add_theme_constant_override("outline_size", 4)
+	l.z_index = FLOAT_Z
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(l)
+	# 没进树就量不到字宽（主题还没拿到），只能先挂上去再往左挪半个字
+	l.position = pos - Vector2(l.get_minimum_size().x * 0.5, 0)
+	floats.append({"node": l, "from": pos, "t": 0.0})
+
+func _update_floats(delta: float) -> void:
+	for i in range(floats.size() - 1, -1, -1):
+		var f: Dictionary = floats[i]
+		f.t = float(f.t) + delta
+		var k := clampf(float(f.t) / FLOAT_SECONDS, 0.0, 1.0)
+		var l: Label = f.node
+		l.position = (f.from as Vector2) + Vector2(0, -FLOAT_RISE * k)
+		l.modulate.a = 1.0 - k * k * k
+		if k >= 1.0:
+			l.queue_free()
+			floats.remove_at(i)
 
 func _build_pools(pool_rects: Array, _types: Array) -> void:
 	var tint := SEAT_TINT if GameManager.is_lounge(GameManager.current_room) else POOL_TINT
@@ -481,6 +523,7 @@ func _try_place(pos: Vector2) -> void:
 	var p := GameManager.snap_center(build_id, pos)
 	if GameManager.buy_facility(GameManager.current_room, build_id, p):
 		_add_facility_node(build_id, p)
+		_float_text(p + Vector2(0, -18), "-%d" % int(GameData.facility(build_id).cost), COST_TINT)
 		if not _teach_prop_tap(build_id):
 			_toast("已建：%s" % String(GameData.facility(build_id).name))
 	else:
@@ -1042,7 +1085,7 @@ func _try_spawn() -> void:
 	pools[pi].taken[idx] = true
 	var guest := Guest.new()
 	guest.setup(species_id, _random_yukata(), spawn, _slot_dict(pi, idx), EXIT_POS)
-	guest.coin_earned.connect(_on_coin)
+	guest.coin_earned.connect(_on_coin.bind(guest))
 	guest.finished.connect(_on_finished)
 	guest.reviewed.connect(_on_reviewed)
 	guest.seated.connect(_on_guest_seated)
@@ -1151,8 +1194,9 @@ func _count_peers(who: Node2D) -> int:
 func _random_yukata() -> Color:
 	return PixelArt.YUKATA[randi() % PixelArt.YUKATA.size()]
 
-func _on_coin(amount: int) -> void:
+func _on_coin(amount: int, guest: Guest) -> void:
 	GameManager.coins += amount
+	_float_text(guest.position + Vector2(0, -58), "+%d" % amount, INCOME_TINT)
 	_update_hud()
 
 func _on_reviewed(guest: Guest, stars: int, wish_id: String, wish_done: bool) -> void:
