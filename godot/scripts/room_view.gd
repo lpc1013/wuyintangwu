@@ -797,7 +797,13 @@ func _advance_line() -> void:
 func _sync_story_card() -> void:
 	if story_card == null:
 		return
-	story_card.visible = story_showing and build_id == "" and not demolish_mode
+	story_card.visible = story_showing and build_id == "" and not demolish_mode and not _modal_up()
+
+## 结算与信箱是盖满整屏的模态面板：对白卡压在它们之上会把「开始新的一天」那枚
+## 按钮削掉半截，压在之下又等于没字。只能先收着，等模态面板退场再露面。
+func _modal_up() -> bool:
+	return (report_panel != null and report_panel.visible) \
+			or (mail_panel != null and mail_panel.visible)
 
 ## 头顶气泡：自言自语与踩雷抱怨是环境音，不值得占掉整块对白卡
 func _bubble(g: Node2D, text: String, glow := false) -> void:
@@ -988,6 +994,9 @@ func _toggle_mail() -> void:
 		mail_head.text = "通风信 · 已读 %d/%d 则" % [GameManager.story_log.size(), Story.line_count()]
 		_refresh_mail()
 	_sync_mail_view()
+	# 信箱盖着的那段时间里攒下的台词，等它退场才轮到露面
+	_sync_story_card()
+	_sync_bottom_stack()
 
 func _refresh_mail() -> void:
 	for c in mail_list.get_children():
@@ -1136,6 +1145,7 @@ func _on_day_reported(report: Dictionary) -> void:
 	report_body.text = "\n".join(lines)
 	get_tree().paused = true
 	report_panel.visible = true
+	_sync_story_card()
 	_sync_bottom_stack()
 
 func _close_report() -> void:
@@ -1143,6 +1153,9 @@ func _close_report() -> void:
 	get_tree().paused = false
 	_refresh_expand()
 	_update_hud()
+	# 结算期间攒下的台词（跨天正好推进章节）现在才准放出来
+	_sync_story_card()
+	_sync_bottom_stack()
 
 func _try_spawn() -> void:
 	if guests.size() >= MAX_GUESTS:
