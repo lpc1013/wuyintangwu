@@ -99,6 +99,21 @@ func _run_checks() -> int:
 			else:
 				print("OK night:", room_id, " lamps=", want_lamps,
 						" sheen=", want_sheen, " lanterns=", lanterns.size())
+		# 飘字只在一家房里验一遍：封顶与回收跟房间无关
+		if room_id == "indoor":
+			var cap: int = room.get("FLOAT_MAX")
+			for i in cap + 3:
+				room.call("_float_text", Vector2(120, 220), "+1", Color(1, 1, 1))
+			var live = room.get("floats")
+			if live.size() != cap:
+				printerr("FAIL 飘字没封顶: ", live.size(), "/", cap)
+				failures += 1
+			room.call("_update_floats", 2.0)
+			if not live.is_empty():
+				printerr("FAIL 飘字到期没回收: ", live.size())
+				failures += 1
+			else:
+				print("OK floats: capped=", cap)
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)

@@ -4,8 +4,8 @@ extends SceneTree
 ##        <scene_or_room> <out_png> [wait_frames] [hour] [time_scale] [toast_text] [panel]
 ## APPDATA 必须改指：4.7 已没有 --user-dir 参数，存档默认落在玩家真实进度目录。
 ## hour/time_scale 用来验证昼夜时段与夜罩；toast_text 仅用于检查提示条排版。
-## panel 取 build:<id> / expand / report / gait / story:<mode>[:<物种>]，
-## 分别检查建造调色板、扩建面板、每日结算弹窗、步态连拍与剧情界面。
+## panel 取 build:<id> / expand / report / float / gait / story:<mode>[:<物种>]，
+## 分别检查建造调色板、扩建面板、每日结算弹窗、金币飘字、步态连拍与剧情界面。
 ## story 的 mode：chat 对白卡、chapter 章节卡、bubble 头顶气泡、mail 信箱列表、letter 单封信正文。
 ## gait 是步态实验台：自己往房间里放几位指定物种的客人并排走，
 ## 攒成一张「行=物种、列=时刻」的胶片直接写进 out_png（不带 %d）。
@@ -74,7 +74,7 @@ func _initialize() -> void:
 			panel_mode = "gait"
 			if extra.length() > 5:
 				gait_ids = extra.substr(5).split("+")
-		elif extra == "expand" or extra == "report":
+		elif extra == "expand" or extra == "report" or extra == "float":
 			panel_mode = extra
 	if args.size() > 7 and args[7].begins_with("rep:"):
 		start_rep = args[7].substr(4).to_float()
@@ -174,12 +174,28 @@ func _open_panel() -> void:
 		current_scene._select_build(build_id)
 	elif panel_mode == "expand":
 		current_scene._toggle_expand()
+	elif panel_mode == "float":
+		_show_floats()
 	elif panel_mode == "report":
 		# 走真实的跨天路径：推进时钟让 GameManager 自己发结算信号
 		gm.hour = 23.9
 		gm._process(2.0)
 	elif panel_mode == "story":
 		_show_story_panel()
+
+## 飘字要在一张帧里同时看到三拍：刚冒出、飘到一半、正在淡掉。
+## 真实时序下同一批字只会同相位，只能把各自的 age 往回拨。
+func _show_floats() -> void:
+	var arr = current_scene.get("floats")
+	var gold = current_scene.get("INCOME_TINT")
+	var red = current_scene.get("COST_TINT")
+	var demo := [[Vector2(300, 300), "+12", gold, 0.0],
+			[Vector2(468, 246), "+7", gold, 0.45],
+			[Vector2(624, 330), "-30", red, 0.92]]
+	for d in demo:
+		current_scene._float_text(d[0], d[1], d[2])
+		var f: Dictionary = arr[arr.size() - 1]
+		f.t = d[3]
 
 ## 剧情四种界面各自的入口都在这里只画一次：买信、读信真会写存档，
 ## 但跑截图时 APPDATA 已经指向 tools/_userdata，碰不到玩家进度。
