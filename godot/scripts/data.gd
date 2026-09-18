@@ -109,6 +109,41 @@ const SPECIES := {
 		"names": ["叽叽", "豆芽", "绒毛", "噗噗", "桃子"]},
 }
 
+## 步态分档：二十个物种共用一套节拍的话，熊和鸭子就走成了一个样。
+## step=步幅倍率（乘 Guest.STEP_PX，决定多久换一次抬脚），speed=移速倍率，
+## dip=落脚那一下身子沉几像素，dip_t=沉按住多久（换帧进度），sway=左右摆几像素，
+## air=腾空那半拍整只抬几像素，rise=脚掌离地几像素（画进抬腿帧），swing=前爪摆幅，
+## frames=一个步序内的姿态轮次。
+const GAITS := {
+	## 熊、水豚、牛：步子迈得长、走得慢、脚几乎不离地，落地那一下按得久
+	"trudge": {"step": 1.35, "speed": 0.78, "dip": 1, "dip_t": 0.45, "sway": 0, "air": 0,
+		"rise": 1, "swing": 0, "frames": ["stepL", "stepR"]},
+	## 鸭、企鹅、海豹：短步、慢行，身子随两脚交替左右倒
+	"waddle": {"step": 0.72, "speed": 0.88, "dip": 1, "dip_t": 0.3, "sway": 1, "air": 0,
+		"rise": 2, "swing": 1, "frames": ["stepL", "stepR"]},
+	## 猫、狐狸、鹿：脚尖点地，几乎没有落地那一下沉降
+	"tiptoe": {"step": 1.0, "speed": 1.16, "dip": 0, "dip_t": 0.28, "sway": 0, "air": 0,
+		"rise": 2, "swing": 1, "frames": ["stepL", "stepR"]},
+	## 兔子、青蛙：不换腿，两脚一起蹬，半拍里整只离地
+	"hop": {"step": 0.9, "speed": 1.05, "dip": 1, "dip_t": 0.25, "sway": 0, "air": 1,
+		"rise": 2, "swing": 1, "frames": ["hop", "walk"]},
+	## 老鼠、刺猬：碎步急走，步幅小到位移一半就换脚
+	"scurry": {"step": 0.55, "speed": 1.3, "dip": 1, "dip_t": 0.2, "sway": 0, "air": 0,
+		"rise": 2, "swing": 1, "frames": ["stepL", "stepR"]},
+	## 柴犬、浣熊、小熊猫：默认档，也就是原来的那套节奏
+	"walk": {"step": 1.0, "speed": 1.0, "dip": 1, "dip_t": 0.28, "sway": 0, "air": 0,
+		"rise": 2, "swing": 1, "frames": ["stepL", "stepR"]},
+}
+
+## 物种 → 档位；没列出的走默认档 "walk"
+const GAIT_OF := {
+	"capy": "trudge", "bear": "trudge", "coww": "trudge", "panda": "trudge", "pig": "trudge",
+	"duck": "waddle", "peng": "waddle", "chick": "waddle", "ottr": "waddle", "seal": "waddle",
+	"cat3": "tiptoe", "foxe": "tiptoe", "deer": "tiptoe",
+	"rabb": "hop", "frog": "hop",
+	"mouse": "scurry", "hedg": "scurry",
+}
+
 ## 汤种：cap 为池位容量，coin_gen 决定是否直接产币，daily_cap 为该汤种单日产币上限，solo 表示只接待一位
 const POOLS := {
 	"hot": {"name": "温泉池", "water": "#7fd4b8", "cap": 4, "coin_gen": true, "daily_cap": 240,
@@ -199,6 +234,10 @@ static func species_ids() -> Array:
 
 static func species(id: String) -> Dictionary:
 	return SPECIES.get(id, {})
+
+## 物种的步态档位：未登记或写错档名一律回落默认档，动画侧不需要再判空
+static func gait_of(species_id: String) -> Dictionary:
+	return GAITS.get(String(GAIT_OF.get(species_id, "walk")), GAITS["walk"])
 
 static func pool(type_id: String) -> Dictionary:
 	return POOLS.get(type_id, {})

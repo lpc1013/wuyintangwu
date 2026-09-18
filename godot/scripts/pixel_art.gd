@@ -2,7 +2,8 @@ class_name PixelArt
 ## 程序化像素精灵工厂：按 GameData.SPECIES 的属性（耳型/尾型/体型/面部标记）组合绘制，
 ## 与 HTML 版同一立意——不依赖外部素材表，代码逐像素绘制。
 ## 所有姿态一律正对镜头，五官只需画一遍：行走睁眼、泡汤闭眼加毛巾、茶室盘坐捧茶。
-## 行走另有 stepL / stepR 两帧，只换抬哪条腿，画布尺寸与锚点三帧完全一致。
+## 行走另有 stepL / stepR 两帧，只换抬哪条腿；跳步物种再多一帧 hop（两脚一起离地）。
+## 各帧画布尺寸与锚点完全一致，切换时不会有跳动。
 
 const OUTLINE := Color(0.16, 0.1, 0.14, 1.0)
 const TOWEL := Color(0.97, 0.97, 0.95)
@@ -153,16 +154,19 @@ static func make_animal(species_id: String, yukata: Color, pose: String) -> Imag
 	elif pose == "rest":
 		im = _rest(sp, t, yukata)
 	else:
-		im = _walk(sp, t, yukata, stride(pose))
+		im = _walk(sp, t, yukata, stride(pose), species_id)
 	return _rescaled(im, float(sp.get("size", 1.0)))
 
-## 姿态名 → 抬哪只脚：0 两脚着地（站立、落位前的那一下），1 左脚抬起，2 右脚抬起。
-## 走路只需这三张图，切换由 guest 按实际位移驱动，不需要更多帧也读得出在迈步。
+## 姿态名 → 抬哪只脚：0 两脚着地（站立、落位前的那一下），1 左脚抬起，2 右脚抬起，
+## 3 两脚一起离地（跳步物种的腾空帧：兔、蛙）。
+## 走路只需这四张图，切换由 guest 按实际位移驱动，不需要更多帧也读得出在迈步。
 static func stride(pose: String) -> int:
 	if pose == "stepL":
 		return 1
 	if pose == "stepR":
 		return 2
+	if pose == "hop":
+		return 3
 	return 0
 
 ## 体型缩放：放大输出画布以免大体型被裁切，并以底部中心为锚，
@@ -188,17 +192,32 @@ static func _rescaled(im: Image, s: float) -> Image:
 
 ## 客人始终正对镜头：行走与泡汤共用同一颗头，只换表情与下半身。
 ## 好处是五官只需画一遍，玩家在人群里一眼读到物种与情绪。
-static func _walk(sp: Dictionary, t: Dictionary, yukata: Color, lift: int = 0) -> Image:
+static func _walk(sp: Dictionary, t: Dictionary, yukata: Color, lift: int = 0, sp_id := "") -> Image:
+	var g := GameData.gait_of(sp_id)
+	var rise := int(g.get("rise", 2))
+	var swing := int(g.get("swing", 1))
 	var im := make_image(WALK_W, WALK_H)
 	# 尾巴先画：正面视角下只从身侧探出一截，根部被身体挡住
 	_draw_tail(im, String(sp.get("tail", "stub")), t, bool(sp.get("ring", false)))
 	# 肩毛：把头与浴衣之间那道缝填实，脖子不会断
 	fill_ball(im, 16.0, 25.0, 8.0, 5.0, t)
 	_draw_yukata(im, yukata, t)
-	_draw_paw(im, 6, t, -1 if lift == 1 else (1 if lift == 2 else 0))
-	_draw_paw(im, 21, t, 1 if lift == 1 else (-1 if lift == 2 else 0))
-	_draw_leg(im, 10, t, lift == 1)
-	_draw_leg(im, 18, t, lift == 2)
+	# 前爪与迈出的那条腿反着摆：迈左脚时左爪收到袖里、右爪甩到身前；腾空帧两爪一起收
+	var paw_l := 0
+	var paw_r := 0
+	if lift == 1:
+		paw_l = -swing
+		paw_r = swing
+	elif lift == 2:
+		paw_l = swing
+		paw_r = -swing
+	elif lift == 3:
+		paw_l = swing
+		paw_r = swing
+	_draw_paw(im, 6, t, paw_l)
+	_draw_paw(im, 21, t, paw_r)
+	_draw_leg(im, 10, t, lift == 1 or lift == 3, rise)
+	_draw_leg(im, 18, t, lift == 2 or lift == 3, rise)
 	_head(im, sp, t, true, false)
 	outline_and_rim(im)
 	return im
@@ -367,13 +386,15 @@ static func _draw_paw(im: Image, x: int, t: Dictionary, sway := 0) -> void:
 
 ## 腿与脚掌：掌宽六格、两脚之间留两格缝，正面才读得出「两条腿分开踩在地上」。
 ## 小脚掌挨在一起会被看成裙底掉下的一整块，抬脚也就没人看得见。
-## 抬脚整只提两格、压一道脚底暗面：离地两格是这个尺寸下还能认出的最小幅度。
-static func _draw_leg(im: Image, x: int, t: Dictionary, lifted := false) -> void:
+## 抬脚幅度按物种步态给：沉的物种（熊、牛）只离地一格，脚底板几乎擦着地面挪；
+## 轻的物种离地两格——这是这个尺寸下还能认出的最小幅度。
+static func _draw_leg(im: Image, x: int, t: Dictionary, lifted := false, rise := 2) -> void:
 	if lifted:
-		fill_rect(im, x, 35, 3, 1, t.shade)
-		fill_rect(im, x - 1, 36, 6, 2, t.dark)
-		fill_rect(im, x - 1, 36, 6, 1, t.dark_lit)
-		fill_rect(im, x - 1, 37, 6, 1, t.deep)
+		var fy := 38 - maxi(1, rise)
+		fill_rect(im, x, 35, 3, fy - 35, t.shade)
+		fill_rect(im, x - 1, fy, 6, 2, t.dark)
+		fill_rect(im, x - 1, fy, 6, 1, t.dark_lit)
+		fill_rect(im, x - 1, fy + 1, 6, 1, t.deep)
 		return
 	fill_rect(im, x, 35, 3, 3, t.shade)
 	fill_rect(im, x - 1, 38, 6, 2, t.dark)

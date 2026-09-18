@@ -1,5 +1,5 @@
 extends SceneTree
-## 导出精灵对照表：20 物种 × (站立 / 迈步两帧 / 泡汤 / 落座)，用于校验属性驱动的程序化像素造型。
+## 导出精灵对照表：20 物种 × (站立 / 迈步两帧 / 腾空 / 泡汤 / 落座)，用于校验属性驱动的程序化像素造型。
 ## 用法：APPDATA=<仓库>/godot/tools/_userdata Godot_console.exe --headless --path godot --script res://scripts/spritesheet.gd
 ## APPDATA 必须改指：4.7 已没有 --user-dir 参数，存档默认落在玩家真实进度目录。
 
@@ -7,8 +7,9 @@ const OUT := "res://../vibe_images/_sprite_sheet.png"
 const COLS := 4
 const CELL := 170
 const SCALE := 3
-## 三张行走帧并排才看得出步态差多少：同一只动物的 walk / stepL / stepR 落在同格列的三个区块里
-const POSES := ["walk", "stepL", "stepR", "soak", "rest"]
+## 三张行走帧并排才看得出步态差多少：同一只动物的 walk / stepL / stepR 落在同格列的三个区块里。
+## hop 只有兔与蛙用得上，但每只都画一份，才能一眼看出某档是不是该有这一帧。
+const POSES := ["walk", "stepL", "stepR", "hop", "soak", "rest"]
 
 func _initialize() -> void:
 	call_deferred("_run")

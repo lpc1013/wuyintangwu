@@ -15,9 +15,10 @@ const REST_MAX := 21.0
 const COIN_INTERVAL := 2.0
 const COIN_INTERVAL_REST := 3.0
 const FOOT_PAD := 2.0
-## 一脚步子迈过的地面距离：步频由它与实际速度共同决定，动画跟着位移走就不会滑步
+## 基准步幅：一脚步子迈过的地面距离，实际步幅再乘物种步态档位。
+## 步频由它与实际速度共同决定，动画跟着位移走就不会滑步
 const STEP_PX := 20.0
-## 两帧交替抬脚，落地那一下身子沉回地面线
+## 基准换帧序列：只换抬哪条腿，具体走哪几帧由步态档位给（跳步物种另有 hop 帧）
 const STRIDE := ["stepL", "stepR"]
 
 signal coin_earned(amount: int)
@@ -51,6 +52,9 @@ var emote_left := 2.0
 var bob_t := randf() * 6.0
 ## 走过的路程累计：脚步帧与身体沉浮都由它推出，而不是挂在不相关的时间上
 var stride_px := 0.0
+## 步态档位与按档位换算出的移速：步幅、换帧序列、落地沉浮、左右摆幅都取自这张表
+var gait := {}
+var walk_speed := SPEED
 var _stepping_out := true
 var _murmured := false
 var _step_out_pos := Vector2.ZERO
@@ -63,6 +67,8 @@ func setup(p_species: String, p_yukata: Color, spawn: Vector2, p_slot: Dictionar
 	species = p_species
 	var sp := GameData.species(p_species)
 	guest_name = String(sp.names.pick_random())
+	gait = GameData.gait_of(p_species)
+	walk_speed = SPEED * float(gait.get("speed", 1.0))
 	affinity = GameData.affinity(p_species, String(p_slot.get("type", "")))
 	yukata = p_yukata
 	slot = p_slot
@@ -106,7 +112,7 @@ func _process(delta: float) -> void:
 
 func _walk(delta: float, to: Vector2, on_arrive: Callable) -> void:
 	var d := to - position
-	var step := SPEED * delta
+	var step := walk_speed * delta
 	var from := position
 	if d.length() <= step:
 		position = to
@@ -118,12 +124,28 @@ func _walk(delta: float, to: Vector2, on_arrive: Callable) -> void:
 	# 不做左右镜像：正对镜头的角色一翻就换了浴衣的衽向、换了尾巴那一边、连左上光都翻到右上，
 	# 玩家看到的不是「转身」而是「扭一下」。方向交给脚步与位移去说。
 	stride_px += from.distance_to(position)
-	var n := int(stride_px / STEP_PX)
-	var phase := fmod(stride_px, STEP_PX) / STEP_PX
-	_set_pose(STRIDE[n % 2])
-	## 落脚那半拍身子往下沉一格，撑腿的其余时间回到地面线。
-	## 只往下不往上：整张图抬起来会把撑地的那只脚一起带离地面，看着像在飘着走
-	sprite.offset = Vector2(0, _walk_off + (1 if phase < 0.28 else 0))
+	var span := STEP_PX * float(gait.get("step", 1.0))
+	var n := int(stride_px / span)
+	var phase := fmod(stride_px, span) / span
+	var frames: Array = gait.get("frames", STRIDE)
+	var pose := String(frames[n % frames.size()])
+	_set_pose(pose)
+	sprite.offset = Vector2(_sway(n), _walk_off + _bob(pose, phase))
+
+## 竖直方向只有一格活动空间：落脚那一下沉一格，撑腿的其余时间回到地面线。
+## 走路时只往下不往上——整张图抬起来会把撑地的那只脚一起带离地面，看着像在飘着走。
+## 跳步物种反过来：腾空帧两脚在画里已经收起来，这时整只离地才是对的。
+func _bob(pose: String, phase: float) -> float:
+	if pose == "hop":
+		return -float(gait.get("air", 0.0)) if phase > 0.2 else 0.0
+	if phase < float(gait.get("dip_t", 0.28)):
+		return float(gait.get("dip", 0.0))
+	return 0.0
+
+## 摇摆：身子随两脚交替左右倒，只有蹼禽与海豹那一档给非零值
+func _sway(n: int) -> float:
+	var s := float(gait.get("sway", 0.0))
+	return s if n % 2 == 0 else -s
 
 ## 走完一段：回到两脚着地的中立帧，落座与泡水都从这个姿势接
 func _finish_walk() -> void:

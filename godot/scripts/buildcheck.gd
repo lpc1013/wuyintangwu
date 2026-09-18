@@ -169,6 +169,47 @@ func _run() -> void:
 	_truthy("抬腿那侧的爪子荡到后面、对侧甩到前面", step_l.get_pixel(8, 31).a < 0.5
 			and step_l.get_pixel(23, 32).a > 0.5 and walk.get_pixel(8, 31).a > 0.5
 			and walk.get_pixel(23, 32).a < 0.5)
+	# 步态分档：档位不只是表上的数字，得真的落到画布格子上
+	var gait_covered := true
+	for id: String in GameData.species_ids():
+		var g: Dictionary = GameData.gait_of(id)
+		if g.is_empty() or not g.has("step") or not g.has("frames"):
+			gait_covered = false
+	_truthy("每个物种都落到一个存在的步态档", gait_covered)
+	var gait_mapped := true
+	for id: String in GameData.GAIT_OF.keys():
+		if not GameData.SPECIES.has(id) or not GameData.GAITS.has(String(GameData.GAIT_OF[id])):
+			gait_mapped = false
+	_truthy("步态登记表没有拼错的物种或档名", gait_mapped)
+	var gait_poses := true
+	for gid: String in GameData.GAITS.keys():
+		for pose: String in (GameData.GAITS[gid].get("frames", []) as Array):
+			if not ["walk", "stepL", "stepR", "hop"].has(pose):
+				gait_poses = false
+	_truthy("档位用到的姿态名都画得出来", gait_poses)
+	# 抬脚格数：沉的一档脚底板几乎擦地，默认档离地两格
+	_truthy("熊只抬一格、柴犬抬两格",
+			_clearance("bear", 1) == 1 and _clearance("shib", 1) == 2
+			and _clearance("shib", 2) == 2)
+	# 摆臂：沉重档爪子跟着身子不动（两帧同点同色），默认档一迈步爪子就换前后
+	_truthy("沉重档前爪不荡、默认档荡",
+			_solid(_walk_frame("bear", 1), 23, 32) == _solid(_walk_frame("bear", 0), 23, 32)
+			and _solid(_walk_frame("bear", 1), 8, 31) == _solid(_walk_frame("bear", 0), 8, 31)
+			and _solid(step_l, 23, 32) != _solid(walk, 23, 32)
+			and _solid(step_l, 8, 31) != _solid(walk, 8, 31))
+	_truthy("只有蹼禽那一档左右摆", int(GameData.gait_of("duck").get("sway", -1)) == 1
+			and int(GameData.gait_of("bear").get("sway", -1)) == 0
+			and int(GameData.gait_of("cat3").get("sway", -1)) == 0)
+	# 跳步档位两脚一起离地，落地帧又一起踩实
+	_truthy("腾空帧两脚一起离地", _clearance("rabb", 3) == 2
+			and _foot_row(_walk_frame("rabb", 3), 12) < _foot_row(_walk_frame("rabb", 0), 12)
+			and _foot_row(_walk_frame("rabb", 3), 19) < _foot_row(_walk_frame("rabb", 0), 19))
+	_truthy("脚尖点地的那档落地不沉", int(GameData.gait_of("cat3").get("dip", -1)) == 0
+			and int(GameData.gait_of("shib").get("dip", -1)) == 1)
+	_truthy("碎步档步幅最短、移速最快", float(GameData.gait_of("mouse").get("step", 9.0)) < 0.6
+			and float(GameData.gait_of("mouse").get("speed", 0.0)) > 1.2)
+	_truthy("沉重档步子长、走得慢", float(GameData.gait_of("bear").get("step", 0.0)) > 1.2
+			and float(GameData.gait_of("bear").get("speed", 9.0)) < 0.9)
 	var rest_lines_ok := not GameData.REVIEW_LINES_LOUNGE.is_empty()
 	for line: String in GameData.REVIEW_LINES_LOUNGE:
 		if line.find("泡") >= 0:
@@ -503,3 +544,28 @@ func _fill(room: String, id: String, want: int) -> int:
 				if gm.buy_facility(room, id, center):
 					placed += 1
 	return placed
+
+## 未缩放的行走帧：直连 PixelArt._walk 取 32×40 原始画布。
+## 体型缩放会把行号整体挪掉，逐格比抬脚高度只能在原始画布上做。
+func _walk_frame(id: String, lift: int) -> Image:
+	var sp: Dictionary = GameData.species(id)
+	var t := PixelArt.tones(PixelArt.hex(String(sp.get("body", "#808080"))),
+			PixelArt.hex(String(sp.get("belly", "#ffffff"))),
+			PixelArt.hex(String(sp.get("dark", "#303030"))))
+	return PixelArt._walk(sp, t, PixelArt.YUKATA[0], lift, id)
+
+## 某像素是否画了东西：比对两帧的同一格用
+func _solid(im: Image, x: int, y: int) -> bool:
+	return im.get_pixel(x, y).a > 0.5
+
+## 某列最靠下的不透明像素：脚掌踩到第几格，看的就是这一行
+func _foot_row(im: Image, x: int) -> int:
+	for y in range(im.get_height() - 1, -1, -1):
+		if im.get_pixel(x, y).a > 0.5:
+			return y
+	return -1
+
+## 抬脚格数：同一条腿在站立帧的脚底行，减它在迈步帧的脚底行
+func _clearance(id: String, lift: int) -> int:
+	var x := 12 if lift == 1 or lift == 3 else 19
+	return _foot_row(_walk_frame(id, 0), x) - _foot_row(_walk_frame(id, lift), x)
