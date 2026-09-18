@@ -493,6 +493,44 @@ func _run() -> void:
 	_truthy("存档恢复收藏册", gm.story_log.has("chat-foxe-1"))
 	_truthy("存档恢复章节", gm.chapter == 4)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
+	_check_night()
+
+## 夜间氛围：夜罩曲线必须连续（整点跳档很出戏），灯点必须落在画面里，
+## 光晕贴图要中心实心、边缘全透并且只生成一次。
+func _check_night() -> void:
+	var prev := 0.0
+	var biggest := 0.0
+	for i in 24 * 20:
+		gm.hour = float(i) / 20.0
+		var cur: float = gm.night_light()
+		if i > 0:
+			biggest = maxf(biggest, absf(cur - prev))
+		prev = cur
+	_truthy("夜罩连续过渡，步长 3 分钟内最大变化 %0.3f" % biggest, biggest < 0.01)
+	gm.hour = 9.0
+	_truthy("上午平台期完全不压夜罩", gm.night_light() == 0.0)
+	gm.hour = 11.0
+	_truthy("正午前天色仍清", gm.night_light() < 0.03)
+	gm.hour = 23.0
+	var darkest: float = gm.night_light()
+	_truthy("入夜最重的一档压得住夜罩", darkest > 0.55)
+	gm.hour = 17.0
+	_truthy("黄昏轻于深夜", gm.night_light() < darkest)
+	gm.hour = 9.0
+	var rooms: Dictionary = gm.ROOMS
+	var vp: Vector2 = Vector2(gm.VIEWPORT_SIZE)
+	for room_id: String in rooms:
+		var lights: Array = gm.room_cfg(room_id).get("lights", [])
+		_truthy("%s 备有入夜灯点" % room_id, not lights.is_empty())
+		for pos: Vector2 in lights:
+			_truthy("%s 灯点 %s 在画面内" % [room_id, pos],
+					Rect2(Vector2.ZERO, vp).has_point(pos))
+	var glow := PixelArt.glow_texture()
+	var gi := glow.get_image()
+	var mid := glow.get_width() / 2
+	_truthy("光晕中心不透明", gi.get_pixel(mid, mid).a > 0.9)
+	_truthy("光晕四角全透", gi.get_pixel(0, 0).a == 0.0 and gi.get_pixel(gi.get_width() - 1, gi.get_height() - 1).a == 0.0)
+	_truthy("光晕贴图复用同一份", glow == PixelArt.glow_texture())
 
 func _on_report(report: Dictionary) -> void:
 	report_seen = report

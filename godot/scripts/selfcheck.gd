@@ -76,6 +76,29 @@ func _run_checks() -> int:
 		if need > budget:
 			printerr("FAIL room ", room_id, " 顶栏最小宽度 ", "%.0f" % need, " 超出画布 ", budget)
 			failures += 1
+		# 夜里的暖光是运行时照着配置表长出来的：数量对不上就是 _build_glows 与 ROOMS 脱了钩。
+		# 只能走 get()——room 的静态类型是 Node，编译期看不见 room_view 的成员。
+		var lamps = room.get("lamp_glows")
+		var sheen = room.get("water_glows")
+		var want_lamps: int = gm_node.ROOMS[room_id].lights.size()
+		var want_sheen: int = 0 if gm_node.is_lounge(room_id) else want_pools
+		if lamps == null or sheen == null or lamps.size() != want_lamps or sheen.size() != want_sheen:
+			var got_lamps: int = 0 if lamps == null else lamps.size()
+			var got_sheen: int = 0 if sheen == null else sheen.size()
+			printerr("FAIL room ", room_id, " 灯光 ", got_lamps, "/", want_lamps,
+					" 水光 ", got_sheen, "/", want_sheen)
+			failures += 1
+		else:
+			# 玩家挂的纸灯笼也要跟着亮：加一盏就该多一圈光（数组是同一份，clear 不换引用）
+			var lanterns = room.get("lantern_glows")
+			var before: int = lanterns.size()
+			room.call("_add_facility_node", "lantern", Vector2(140, 96))
+			if lanterns.size() != before + 1:
+				printerr("FAIL room ", room_id, " 挂上灯笼却没点亮 ", before, "→", lanterns.size())
+				failures += 1
+			else:
+				print("OK night:", room_id, " lamps=", want_lamps,
+						" sheen=", want_sheen, " lanterns=", lanterns.size())
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)
