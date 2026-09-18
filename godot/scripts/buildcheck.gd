@@ -494,6 +494,7 @@ func _run() -> void:
 	_truthy("存档恢复章节", gm.chapter == 4)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	_check_night()
+	_check_steam()
 
 ## 夜间氛围：夜罩曲线必须连续（整点跳档很出戏），灯点必须落在画面里，
 ## 光晕贴图要中心实心、边缘全透并且只生成一次。
@@ -531,6 +532,40 @@ func _check_night() -> void:
 	_truthy("光晕中心不透明", gi.get_pixel(mid, mid).a > 0.9)
 	_truthy("光晕四角全透", gi.get_pixel(0, 0).a == 0.0 and gi.get_pixel(gi.get_width() - 1, gi.get_height() - 1).a == 0.0)
 	_truthy("光晕贴图复用同一份", glow == PixelArt.glow_texture())
+
+## 热气浓淡全在表的 steam 档上：漏填会被当成 0，那口池子就从此不冒汽，
+## 所以逐条盯着；贴图本身只验形状（主团实心、四角全透、只烘一次）。
+func _check_steam() -> void:
+	var pools: Dictionary = GameData.POOLS
+	for type_id: String in pools:
+		var p: Dictionary = pools[type_id]
+		_truthy("%s 登记了热气浓淡" % type_id, p.has("steam"))
+		var s: float = float(p.get("steam", -1.0))
+		_truthy("%s 浓淡在 0..1（%0.2f）" % [type_id, s], s >= 0.0 and s <= 1.0)
+	for cold_id: String in ["ice", "sand", "tatami"]:
+		_truthy("%s 不冒热气" % cold_id, GameData.pool_steam(cold_id) == 0.0)
+	_truthy("温泉池浓过任何别的汤", GameData.pool_steam("hot") >= 0.9)
+	_truthy("牛奶浴比温泉淡", GameData.pool_steam("milk") < GameData.pool_steam("hot"))
+	_truthy("没登记的汤种按不冒汽处理", GameData.pool_steam("nope") == 0.0)
+	var rooms: Dictionary = gm.ROOMS
+	for room_id: String in rooms:
+		var types: Array = rooms[room_id].get("pool_types", [])
+		var steaming := 0
+		for i in types.size():
+			if GameData.pool_steam(String(types[i])) > 0.0:
+				steaming += 1
+		if String(rooms[room_id].get("kind", "onsen")) == "lounge":
+			_truthy("%s 一座热气的池子都没有" % room_id, steaming == 0)
+		else:
+			_truthy("%s 至少一口池冒热气" % room_id, steaming > 0)
+	var tex := PixelArt.steam_texture()
+	var im := tex.get_image()
+	# 主团在 (0.37, 0.63)：那一点必须实心，不然飘起来是根半透的雾柱
+	var core := im.get_pixel(int(0.37 * PixelArt.STEAM_SIZE), int(0.63 * PixelArt.STEAM_SIZE))
+	_truthy("热气团心不透明", core.a > 0.6 and core.r > 0.99)
+	_truthy("热气团四角全透", im.get_pixel(0, 0).a == 0.0
+			and im.get_pixel(im.get_width() - 1, im.get_height() - 1).a == 0.0)
+	_truthy("热气贴图复用同一份", tex == PixelArt.steam_texture())
 
 func _on_report(report: Dictionary) -> void:
 	report_seen = report

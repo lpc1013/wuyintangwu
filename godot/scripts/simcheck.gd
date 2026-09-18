@@ -41,6 +41,7 @@ var upgraded := false
 var saw_bubble := false
 var saw_income_float := false
 var saw_cost_float := false
+var saw_steam := false
 var visits_untracked := 0
 var chat_logged := false
 var chat_card_shown := false
@@ -118,26 +119,28 @@ func _process(_delta: float) -> bool:
 		max_affinity = maxi(max_affinity, g.affinity)
 		min_affinity = mini(min_affinity, g.affinity)
 		species_seen[g.species] = true
-	if not (saw_income_float and saw_cost_float):
-		_note_floats()
+	if not (saw_income_float and saw_cost_float and saw_steam):
+		_note_fx()
 	if frame > LAST_FRAME:
 		Engine.time_scale = 1.0
 		return _report(gm)
 	return false
 
-## 飘字必须是在真跑动里冒出来的：自建存档里 _on_coin 与 _try_place 各接了一头，
-## 只靠截图那张钉住的帧证明不了接线。当前还在树上的字才作数，所以每帧都要问。
-func _note_floats() -> void:
+## 飘字与热气必须是在真跑动里冒出来的：自建存档里 _on_coin 与 _try_place 各接了一头，
+## 只靠截图那张钉住的帧证明不了接线。当前还在树上的才作数，所以每帧都要问。
+func _note_fx() -> void:
 	var live = current_scene.get("floats")
-	if live == null:
-		return
-	for f in live:
-		var l: Label = (f as Dictionary).node
-		var text := String(l.text)
-		if text.begins_with("+"):
-			saw_income_float = true
-		elif text.begins_with("-"):
-			saw_cost_float = true
+	if live != null:
+		for f in live:
+			var l: Label = (f as Dictionary).node
+			var text := String(l.text)
+			if text.begins_with("+"):
+				saw_income_float = true
+			elif text.begins_with("-"):
+				saw_cost_float = true
+	var steam = current_scene.get("steams")
+	if steam != null and not steam.is_empty():
+		saw_steam = true
 
 ## 在背景留白的地面块里依次摆好心愿所需设施；返回成功建设数
 func _furnish(gm: Node) -> int:
@@ -330,7 +333,7 @@ func _report(gm: Node) -> bool:
 	print("SIM story chat=", chat_logged, "/", chat_card_shown, "/", chat_card_cleared,
 		" bubble=", saw_bubble, " prop=", prop_read,
 		" mail=", mail_panel_opened, "/", mail_read, "/", mail_forecast, "/", mail_closed,
-		" float=", saw_income_float, "/", saw_cost_float,
+		" float=", saw_income_float, "/", saw_cost_float, " steam=", saw_steam,
 		" untracked=", visits_untracked, " chapter=", gm.chapter + 1,
 		" read=", gm.story_log.size(), "/", Story.line_count())
 	var checks := {
@@ -357,6 +360,7 @@ func _report(gm: Node) -> bool:
 		"自言自语冒过泡": saw_bubble,
 		"进账飘过金币字": saw_income_float,
 		"花费飘过扣钱字": saw_cost_float,
+		"池面冒过热气": saw_steam,
 		"点家具读到道具故事": prop_read,
 		"顶栏信箱打得开关得上": mail_panel_opened and mail_closed,
 		"读信之后风向才落地": mail_read and mail_forecast,

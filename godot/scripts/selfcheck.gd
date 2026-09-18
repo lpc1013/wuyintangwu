@@ -99,6 +99,34 @@ func _run_checks() -> int:
 			else:
 				print("OK night:", room_id, " lamps=", want_lamps,
 						" sheen=", want_sheen, " lanterns=", lanterns.size())
+		# 热气按汤种的 steam 档长出来：清单对不上就是 _build_steam 与 POOLS 脱了钩
+		var spools = room.get("steam_pools")
+		var ptypes: Array = gm_node.ROOMS[room_id].pool_types
+		var want_steam := 0
+		for ti in ptypes.size():
+			if GameData.pool_steam(String(ptypes[ti])) > 0.0:
+				want_steam += 1
+		if spools == null or spools.size() != want_steam:
+			var got_steam: int = 0 if spools == null else spools.size()
+			printerr("FAIL room ", room_id, " 冒汽池 ", got_steam, "/", want_steam)
+			failures += 1
+		else:
+			print("OK steam:", room_id, " pools=", want_steam)
+		# 封顶与回收跟房间无关，只在一家房里验一遍
+		if room_id == "indoor" and want_steam > 0:
+			var scap: int = room.get("STEAM_MAX")
+			for si in scap + 3:
+				room.call("_spawn_steam", 0, 1.0)
+			var live_s = room.get("steams")
+			if live_s.size() != scap:
+				printerr("FAIL 热气没封顶: ", live_s.size(), "/", scap)
+				failures += 1
+			room.call("_update_steam", 4.0)
+			if not live_s.is_empty():
+				printerr("FAIL 热气到期没回收: ", live_s.size())
+				failures += 1
+			else:
+				print("OK steam: capped=", scap)
 		# 飘字只在一家房里验一遍：封顶与回收跟房间无关
 		if room_id == "indoor":
 			var cap: int = room.get("FLOAT_MAX")
