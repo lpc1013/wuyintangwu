@@ -7,7 +7,9 @@ extends SceneTree
 ## panel 取 build:<id> / expand / report / gait / story:<mode>[:<物种>]，
 ## 分别检查建造调色板、扩建面板、每日结算弹窗、步态连拍与剧情界面。
 ## story 的 mode：chat 对白卡、chapter 章节卡、bubble 头顶气泡、mail 信箱列表、letter 单封信正文。
-## gait 时 out_png 要带一个 %d：连截 12 张，每张只留那位客人脚下 96×100。
+## gait 是步态实验台：自己往房间里放几位指定物种的客人并排走，
+## 攒成一张「行=物种、列=时刻」的胶片直接写进 out_png（不带 %d）。
+## 想换比较对象就写成 gait:bear+duck+cat3，不给名单则用六个档位的代表物种。
 
 var frame := 0
 var target := "res://scenes/title.tscn"
@@ -24,9 +26,14 @@ var story_kind := ""
 var story_species := "cat3"
 ## 气泡只贴在泡定在池里的客人头顶，没等到人就白截一张
 var bubble_done := false
-## 步态连拍的当前对象与张数
-var gait_guest: Node
+## 步态实验台：并排走的那几位客人、拼好的胶片、以及起算帧
+var gait_pals: Array = []
+var gait_sheet: Image
+var gait_base := 0
 var gait_shot := 0
+## 名单：六个步态档位各挑一个代表，前三个正是「熊沉、鸭晃、猫轻」
+const GAIT_DEFAULT_IDS := ["bear", "duck", "cat3", "rabb", "mouse", "shib"]
+var gait_ids: Array = GAIT_DEFAULT_IDS
 const GAIT_TOTAL := 12
 const GAIT_EVERY := 4
 const GAIT_W := 96
@@ -63,7 +70,11 @@ func _initialize() -> void:
 			if colon >= 0:
 				story_species = story_kind.substr(colon + 1)
 				story_kind = story_kind.substr(0, colon)
-		elif extra == "expand" or extra == "report" or extra == "gait":
+		elif extra.begins_with("gait"):
+			panel_mode = "gait"
+			if extra.length() > 5:
+				gait_ids = extra.substr(5).split("+")
+		elif extra == "expand" or extra == "report":
 			panel_mode = extra
 	if args.size() > 7 and args[7].begins_with("rep:"):
 		start_rep = args[7].substr(4).to_float()
@@ -254,33 +265,84 @@ func _capture() -> void:
 
 ## ---------------- 步态连拍 ----------------
 
-## panel 传 gait，out_png 里带一个 %d：同一只走路的客人按固定帧距连截若干张，
-## 每张只留脚下那一块。静态单帧看不出步态，拼成胶片才知道脚有没有跟上位移。
+## 步态要动的东西太多（步幅、换帧序列、落地沉浮、左右摆幅），随机抓到一位客人连拍根本比不出来。
+## 这里自己往房间里按名单放几位客人，让他们朝同一方向并排走，
+## 每格截脚下那块，攒成「行=物种、列=时刻」的一张胶片。
 func _try_gait() -> void:
-	if gait_guest == null:
+	if gait_pals.is_empty():
 		if frame <= wait_frames:
 			return
-		for g: Node in get_nodes_in_group("guests"):
-			if String(g.state_name()) == "WALK_IN":
-				gait_guest = g
-				wait_frames = frame
-				break
-		if gait_guest == null:
-			print("GAIT 没等到正在走路的客人")
+		_spawn_pals()
+		if gait_pals.is_empty():
+			print("GAIT 实验台上一个客人都没放成，名单=", gait_ids)
 			quit(1)
+			return
+		gait_sheet = Image.create(GAIT_TOTAL * GAIT_W, gait_pals.size() * GAIT_H,
+				false, Image.FORMAT_RGBA8)
+		gait_sheet.fill(Color(0.11, 0.08, 0.14, 1.0))
+		gait_base = frame
 		return
-	if frame < wait_frames or (frame - wait_frames) % GAIT_EVERY != 0:
+	if (frame - gait_base) % GAIT_EVERY != 0:
 		return
-	# 4.7 的 Image.crop 只收左上角，连截要的是区域 → get_region
-	var frame_img := root.get_texture().get_image()
-	var p: Vector2 = gait_guest.position
-	var x0 := clampi(int(p.x) - GAIT_HALF_X, 0, frame_img.get_width() - GAIT_W)
-	var y0 := clampi(int(p.y) - GAIT_HALF_Y, 0, frame_img.get_height() - GAIT_H)
-	var region := frame_img.get_region(Rect2i(x0, y0, GAIT_W, GAIT_H))
-	var path := out_path % gait_shot
-	region.save_png(path)
-	print("GAIT ", gait_shot, " pos=", p, " stride=", gait_guest.stride_px,
-			" off=", gait_guest.sprite.offset.y, " -> ", path)
+	var shot := gait_shot
+	if shot >= GAIT_TOTAL:
+		_finish_gait()
+		return
+	_mask_strangers()
+	var screen := root.get_texture().get_image()
+	var xf: Transform2D = current_scene.get_viewport_transform()
+	# 逻辑画布 → 屏幕像素的倍率：窗口被拖大时按倍率取区，再缩回一格一像素的胶片尺寸
+	var sc := maxi(1, int(round(xf.get_scale().x)))
+	for i in gait_pals.size():
+		var g: Node = gait_pals[i]
+		if not is_instance_valid(g):
+			continue
+		var c: Vector2 = xf * Vector2(g.position)
+		var w := GAIT_W * sc
+		var h := GAIT_H * sc
+		var reg := screen.get_region(Rect2i(
+				clampi(int(c.x) - GAIT_HALF_X * sc, 0, screen.get_width() - w),
+				clampi(int(c.y) - GAIT_HALF_Y * sc, 0, screen.get_height() - h), w, h))
+		if sc > 1:
+			reg.resize(GAIT_W, GAIT_H, Image.INTERPOLATE_NEAREST)
+		gait_sheet.blit_rect(reg, Rect2i(0, 0, GAIT_W, GAIT_H),
+				Vector2i(shot * GAIT_W, i * GAIT_H))
+		if shot == 0:
+			print("GAIT row=", i, " ", g.species, " gait=", GameData.GAIT_OF.get(g.species, "walk"),
+					" speed=", g.walk_speed, " pos=", g.position)
 	gait_shot += 1
-	if gait_shot >= GAIT_TOTAL:
-		quit(0)
+
+## 房间里的客人会随时走进胶片格子，实验台上只留名单里这几位
+func _mask_strangers() -> void:
+	for g: Node in get_nodes_in_group("guests"):
+		if not gait_pals.has(g):
+			g.visible = false
+
+## 名单里的物种各放一位：席位表随手拼一个就够，他们一路向下走，走不到落座那一步。
+## 不能静态写 Guest.new()——guest.gd 正文引用了自动加载 GameManager，
+## 而 --script 的入口脚本在自动加载注册之前编译，牵进来就把整个 shot.gd 带崩。
+func _spawn_pals() -> void:
+	var guest_script := load("res://scripts/guest.gd") as GDScript
+	var room_id := String(gm.current_room)
+	for i in gait_ids.size():
+		var id := String(gait_ids[i])
+		if GameData.species(id).is_empty():
+			print("GAIT 物种不存在: ", id)
+			continue
+		var x := 132.0 + i * 108.0
+		var g: Node2D = guest_script.new()
+		g.setup(id, PixelArt.YUKATA[i % PixelArt.YUKATA.size()], Vector2(x, 236.0),
+				{"pos": Vector2(x, 560.0), "water_y": 560.0, "type": "hot",
+					"room": room_id, "pool": 0}, Vector2(x, 620.0))
+		current_scene.add_child(g)
+		gait_pals.append(g)
+
+func _finish_gait() -> void:
+	for g: Node in gait_pals:
+		if not is_instance_valid(g):
+			continue
+		print("GAIT ", g.species, " gait=", GameData.GAIT_OF.get(g.species, "walk"),
+				" speed=", g.walk_speed, " stride=", g.stride_px, " pos=", g.position)
+	var err := gait_sheet.save_png(out_path)
+	print("GAIT sheet err=", err, " cols=", GAIT_TOTAL, " rows=", gait_pals.size(), " -> ", out_path)
+	quit(0)
