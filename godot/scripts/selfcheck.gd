@@ -142,6 +142,38 @@ func _run_checks() -> int:
 				failures += 1
 			else:
 				print("OK floats: capped=", cap)
+		# 对白卡不许压在模态面板上：跨天正好推进章节时，两者会同屏抢底部那块地
+		if room_id == "indoor":
+			var before_fail := failures
+			var card = room.get("story_card")
+			room.set("story_showing", true)
+			room.call("_sync_story_card")
+			if not card.visible:
+				printerr("FAIL 平时挂着台词却不收线")
+				failures += 1
+			room.call("_on_day_reported", {"day": 3, "guests": 1, "income": 10, "wishes": 1,
+					"good": 1, "bad": 0, "stars_avg": 4.0, "rep_delta": 1.0, "by_type": {}})
+			if not room.get("report_panel").visible or card.visible:
+				printerr("FAIL 结算面板开着，对白卡还占着底部")
+				failures += 1
+			room.call("_close_report")
+			if not card.visible:
+				printerr("FAIL 结算关掉后台词没回来 modal=", room.call("_modal_up"),
+						" showing=", room.get("story_showing"))
+				failures += 1
+			if room.get_tree().paused:
+				printerr("FAIL 结算关掉后树还停着")
+				failures += 1
+			room.call("_toggle_mail")
+			if card.visible:
+				printerr("FAIL 信箱开着，对白卡还占着底部")
+				failures += 1
+			room.call("_toggle_mail")
+			if not card.visible:
+				printerr("FAIL 信箱关掉后台词没回来")
+				failures += 1
+			if failures == before_fail:
+				print("OK modal: indoor 对白卡给结算与信箱让位，退场后回来")
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)

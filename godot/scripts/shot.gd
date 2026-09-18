@@ -177,6 +177,9 @@ func _open_panel() -> void:
 	elif panel_mode == "float":
 		_show_floats()
 	elif panel_mode == "report":
+		# 跨天常和推进章节撞在一起：先挂一句章名，看结算面板与对白卡谁让位
+		gm.chapter = 5
+		current_scene._on_chapter_advanced(5)
 		# 走真实的跨天路径：推进时钟让 GameManager 自己发结算信号
 		gm.hour = 23.9
 		gm._process(2.0)
