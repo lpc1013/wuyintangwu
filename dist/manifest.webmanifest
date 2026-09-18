@@ -1,0 +1,16 @@
+{
+  "name": "雾隐汤屋 · 像素动物温泉物语",
+  "short_name": "雾隐汤屋",
+  "description": "像素风动物温泉经营小游戏",
+  "lang": "zh-CN",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#181125",
+  "theme_color": "#181125",
+  "icons": [
+    {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "./icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any"}
+  ]
+}

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#181125">
 <meta name="description" content="雾隐汤屋 · 像素动物温泉经营游戏">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-180.png">
 <title>雾隐汤屋 · 像素动物温泉物语</title>
 <style>
 /* ==================== 基础 ==================== */
@@ -2413,7 +2415,7 @@ function checkLevelEnd(){
   const rank=!ok?'C':(margin>=.5?'S':margin>=.15?'A':'B');
   const reward=ok?lv.reward+(rank==='S'?2:0):0;
   if(ok){G.gems+=reward;G.levelDone[lv.id]=(G.levelDone[lv.id]&&G.levelDone[lv.id]!=='C')?(G.levelDone[lv.id]<rank?rank:G.levelDone[lv.id]):rank;}
-  try{localStorage.setItem(SAVEKEY+'.levels',JSON.stringify(G.levelDone));}catch(e){}
+  try{localStorage.setItem(SAVEKEY+'.levels',JSON.stringify(G.levelDone));}catch(e){saveErr('保存关卡进度',e);}
   G.level=null;G.running=false;SFX[ok?'levelup':'bad']();
   const rows=lv.goals.map(g=>`<div class="kv"><span>${GOAL_NAME[g.type]}</span><b>${Math.min(goalVal(g),g.n)} / ${g.n}</b></div>`).join('');
   openModal(`关卡结算 · ${lv.name}`,`
@@ -2461,6 +2463,8 @@ $('#btnSound').onclick=()=>{SND.on=!SND.on;$('#btnSound').style.opacity=SND.on?1
    存档
 ============================================================ */
 const SAVEKEY='mistvale-tangwu-v1';
+/* 存档诊断：失败时输出可读日志，关键写入失败同时提示玩家 */
+function saveErr(tag,e){console.error('[存档] '+tag+'失败:',e);}
 function saveGame(){
  if(G.mode!=='free'||!G.running)return;
  try{
@@ -2468,7 +2472,7 @@ function saveGame(){
   for(const rid in G.rooms){const r=G.rooms[rid];rooms[rid]={unlocked:r.unlocked,placed:r.placed.map(p=>({id:p.id,x:p.x,y:p.y,level:p.level}))};}
   localStorage.setItem(SAVEKEY,JSON.stringify({v:GAME_VERSION,coins:G.coins,gems:G.gems,rep:G.rep,day:G.day,hour:G.hour,
    dex:G.dex,stats:G.stats,staff:G.staff,dexRewarded:G.dexRewarded,levelDone:G.levelDone,rooms}));
- }catch(e){}
+ }catch(e){saveErr('保存进度',e);toast('存档保存失败','#ff8ba7');}
 }
 function hasSave(){try{return!!localStorage.getItem(SAVEKEY);}catch(e){return false;}}
 function loadGame(){
@@ -2489,7 +2493,7 @@ function loadGame(){
    });
   }
   return true;
- }catch(e){return false;}
+ }catch(e){saveErr('读取进度',e);return false;}
 }
 function resetState(){
  G.mode='free';G.running=false;G.paused=false;G.speed=1;$('#btnSpeed').textContent='×1';$('#btnPause').textContent='⏸';
@@ -2543,14 +2547,13 @@ function saveLayout(){
  document.querySelectorAll('#topbar .chip.drag').forEach(c=>{
   data[c.id]={dx:parseFloat(c.dataset.dx||0),dy:parseFloat(c.dataset.dy||0)};
  });
- try{localStorage.setItem(LAYOUTKEY,JSON.stringify(data));}catch(e){}
- toast('排版已保存','#5ad0a6');
+ try{localStorage.setItem(LAYOUTKEY,JSON.stringify(data));toast('排版已保存','#5ad0a6');}catch(e){saveErr('保存排版',e);toast('排版保存失败','#ff8ba7');}
 }
 function loadLayout(){
  try{
   const d=JSON.parse(localStorage.getItem(LAYOUTKEY));if(!d)return;
   for(const id in d){const c=document.getElementById(id);if(c){c.dataset.dx=d[id].dx;c.dataset.dy=d[id].dy;c.style.transform=`translate(${d[id].dx}px,${d[id].dy}px)`;}}
- }catch(e){}
+ }catch(e){saveErr('读取排版',e);}
 }
 document.querySelectorAll('#topbar .chip.drag').forEach(c=>{
  c.addEventListener('pointerdown',e=>{
@@ -2579,24 +2582,11 @@ $('#btnEditDone').onclick=()=>toggleEdit(false);
 /* ============================================================
    PWA：manifest 动态生成 + Service Worker 升级提示
 ============================================================ */
-function genIcon(sz){
- const c=document.createElement('canvas');c.width=c.height=sz;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
- const u=sz/32;const R=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x*u,y*u,w*u,h*u);};
- R(0,0,32,32,'#181125');R(2,20,28,10,'#4ea88a');R(2,20,28,3,'#7fd4b8');
- R(10,10,12,12,'#b07a3e');R(12,16,8,5,'#e2c290');R(9,8,3,3,'#b07a3e');R(20,8,3,3,'#b07a3e');
- R(13,13,2,2,'#221610');R(17,13,2,2,'#221610');
- R(6,4,2,6,'#ffffff');R(24,6,2,5,'#ffffff');R(14,2,3,2,'#ffffff');
- return c.toDataURL('image/png');
-}
 function setupPWA(){
  try{
-  const man={name:'雾隐汤屋 · 像素动物温泉物语',short_name:'雾隐汤屋',start_url:'.',scope:'.',
-   display:'standalone',orientation:'landscape',background_color:'#181125',theme_color:'#181125',
-   icons:[{src:genIcon(192),sizes:'192x192',type:'image/png'},{src:genIcon(512),sizes:'512x512',type:'image/png'}]};
-  const link=document.createElement('link');link.rel='manifest';
-  link.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/manifest+json'}));
+  const link=document.createElement('link');link.rel='manifest';link.href='./manifest.webmanifest';
   document.head.appendChild(link);
- }catch(e){}
+ }catch(e){saveErr('生成 PWA manifest',e);}
  if('serviceWorker'in navigator&&(location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname))){
   navigator.serviceWorker.register('sw.js').then(reg=>{
    reg.addEventListener('updatefound',()=>{
@@ -2641,13 +2631,13 @@ function bindUI(){
  // 开场按钮下的新档入口
  const rs=el('button','pbtn mini ghost','重置存档');
  rs.style.marginTop='4px';
- rs.onclick=()=>{try{localStorage.removeItem(SAVEKEY);}catch(e){}toast('存档已重置','#ffb45e');$('#btnFree').textContent='自由经营';};
+ rs.onclick=()=>{try{localStorage.removeItem(SAVEKEY);}catch(e){saveErr('重置存档',e);}toast('存档已重置','#ffb45e');$('#btnFree').textContent='自由经营';};
  $('#introBtns').appendChild(rs);
  document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.running&&!G.paused)togglePause(true);});
 }
 /* boot */
 if(location.hash==='#autostart'){setTimeout(()=>{startFree(true);},400);}
-try{const lv=JSON.parse(localStorage.getItem(SAVEKEY+'.levels'));if(lv)G.levelDone=lv;}catch(e){}
+try{const lv=JSON.parse(localStorage.getItem(SAVEKEY+'.levels'));if(lv)G.levelDone=lv;}catch(e){saveErr('读取关卡进度',e);}
 paintIcon($('#coinCv'),iconCoin);paintIcon($('#gemCv'),iconGem);
 initRooms();resetState();bindUI();paintIntro();loadLayout();setupPWA();
 renderRoomTabs();paintWeatherIcon();fit();showIntro();

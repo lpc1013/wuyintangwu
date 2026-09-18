@@ -1,0 +1,25 @@
+{
+  "name": "线条小狗：动物温泉",
+  "short_name": "动物温泉",
+  "description": "像素风动物温泉经营小游戏",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#b8d4e8",
+  "theme_color": "#b8d4e8",
+  "icons": [
+    {
+      "src": "./icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

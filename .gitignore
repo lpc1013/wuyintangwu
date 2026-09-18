@@ -8,3 +8,15 @@
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# 本地备份目录：内容与 git HEAD / vibe_images 母版逐字节重复，入库只会翻倍体积
+Spring/_原图备份/
+Spring/_精修备份/
+
+# 校验用截帧与拼条：shot.gd / spritesheet.gd 可随时重跑生成，不必留档
+# 注意 vibe_images/refined_* 生成母版不在忽略之列——图像生成不可复现，那是唯一的源
+vibe_images/_shot_*.png
+vibe_images/_live_*.png
+vibe_images/_render_*.png
+vibe_images/_sprite_sheet.png
+vibe_images/_facility_band.png
