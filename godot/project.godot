@@ -13,6 +13,7 @@ config_version=5
 config/name="雾隐汤屋 · 像素动物温泉物语"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/ui/icon.png"
 
 [autoload]
 
@@ -23,7 +24,11 @@ GameManager="*res://scripts/game_manager.gd"
 window/size/viewport_width=896
 window/size/viewport_height=512
 window/stretch/mode="viewport"
-window/stretch/scale_mode="integer"
+; 手机窗口常常比 896×512 还窄，整数缩放最低只能到 1 倍，多出来的画面直接被裁掉。
+; 改成 fractional，让 896×512 的逻辑画布整体缩着放得下，代价只是像素不再是整数倍。
+window/stretch/scale_mode="fractional"
+; 4 = Sensor Landscape：网页版靠它提示浏览器锁横屏，竖着只会在中间留一条窄画面
+window/handheld/orientation=4
 
 [rendering]
 

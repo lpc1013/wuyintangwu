@@ -13,10 +13,20 @@ Desktop.ini
 Spring/_原图备份/
 Spring/_精修备份/
 
-# 校验用截帧与拼条：shot.gd / spritesheet.gd 可随时重跑生成，不必留档
+# 校验用截帧与拼条：约定下划线开头即可丢弃，shot.gd / spritesheet.gd / tools 下的脚本随时能重跑
 # 注意 vibe_images/refined_* 生成母版不在忽略之列——图像生成不可复现，那是唯一的源
-vibe_images/_shot_*.png
-vibe_images/_live_*.png
-vibe_images/_render_*.png
-vibe_images/_sprite_sheet.png
-vibe_images/_facility_band.png
+vibe_images/_*.png
+
+# 校验脚本的一次性存档目录：跑 headless 前把 APPDATA 指到这里，别碰真实进度
+godot/tools/_userdata/
+
+# 校验脚本跑之前先备份的真实存档：_save_*.json 只是保险，不入库
+godot/tools/_save_*.json
+
+# 网页版导出产物：启动网页版.bat 能从 godot/ 随时重导，一整套 wasm/pck 二进制不必入库
+/web/
+
+# 取数脚本的中间产物：跑一遍 _dump_story.js 就有，不必入库
+godot/tools/_*.txt
+godot/tools/_*.json
+godot/tools/_*.log
