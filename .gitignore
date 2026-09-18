@@ -20,6 +20,12 @@ vibe_images/_*.png
 # 校验脚本的一次性存档目录：跑 headless 前把 APPDATA 指到这里，别碰真实进度
 godot/tools/_userdata/
 
+# 改刻匾额要拿"字还没刻上去"的原图补木纹，这份缓存与 assets 母版同源，不入库
+godot/tools/_cache/
+
+# QC 过程中随手拼的对比条：retitle_plaque.py / shot.gd 重跑就有，不入库
+vibe_images/_tmp/
+
 # 校验脚本跑之前先备份的真实存档：_save_*.json 只是保险，不入库
 godot/tools/_save_*.json
 
