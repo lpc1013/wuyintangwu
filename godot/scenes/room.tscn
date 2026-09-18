@@ -9,6 +9,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_script")
 
 [node name="BG" type="TextureRect" parent="."]
@@ -55,6 +56,8 @@ color = Color(0.09, 0.06, 0.13, 0.62)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
+offset_left = 8.0
+offset_right = -8.0
 offset_bottom = 40.0
 grow_horizontal = 2
 mouse_filter = 2
@@ -84,10 +87,45 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "金币 0"
 
-[node name="LayoutHint" type="Label" parent="HUD/TopBar"]
+[node name="Dock" type="HBoxContainer" parent="HUD/TopBar"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="DockMail" type="Button" parent="HUD/TopBar/Dock"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "F1 布局"
+text = "信"
+
+[node name="DockLayout" type="Button" parent="HUD/TopBar/Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "布局"
+
+[node name="DockBuild" type="Button" parent="HUD/TopBar/Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "建造"
+
+[node name="DockExpand" type="Button" parent="HUD/TopBar/Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "席位"
+
+[node name="DockDemolish" type="Button" parent="HUD/TopBar/Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+toggle_mode = true
+text = "拆除"
+
+[node name="DockDrop" type="Button" parent="HUD/TopBar/Dock"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "放下"
 
 [node name="BackButton" type="Button" parent="HUD/TopBar"]
 unique_name_in_owner = true

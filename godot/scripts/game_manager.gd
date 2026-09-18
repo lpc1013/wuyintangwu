@@ -5,7 +5,8 @@ const VIEWPORT_SIZE := Vector2i(896, 512)
 const TITLE_BG := "res://assets/bg/title.png"
 const MAP_BG := "res://assets/bg/map-gate.png"
 
-## pools: 池区/功能区矩形（客人入池吸附区）；spawns: 客人出生点；map_anchor: 案内图上的入口按钮位置
+## pools: 池区/功能区矩形（客人入座吸附区）；spawns: 客人出生点；map_anchor: 案内图上的入口按钮位置
+## kind: onsen（默认，下水泡汤）| lounge（落座喝茶，客人换成盘坐姿态、停留更久）
 const ROOMS := {
 	"ooike": {
 		"label": "大池 · 室内大浴场",
@@ -13,6 +14,9 @@ const ROOMS := {
 		"pools": [Rect2(121, 88, 620, 224)],
 		"pool_types": ["hot"],
 		"spawns": [Vector2(90, 490), Vector2(448, 500), Vector2(806, 490)],
+		# 池沿两条坐凳带 + 前排两段裸地板（水壶、木屐、凳腿都画在它们之间）
+		"lots": [Rect2(304, 456, 144, 56), Rect2(560, 456, 144, 56),
+			Rect2(56, 328, 208, 36), Rect2(688, 328, 160, 36)],
 		"map_anchor": Vector2(140, 440),
 		"unlock_rep": 0,
 	},
@@ -22,6 +26,8 @@ const ROOMS := {
 		"pools": [Rect2(138, 227, 612, 110)],
 		"pool_types": ["herb"],
 		"spawns": [Vector2(120, 492), Vector2(448, 500), Vector2(776, 492)],
+		# 洗漱凳排到了走廊边，只剩竹丛苔地一整块 + 右侧毛巾筐与木架之间一条石沿
+		"lots": [Rect2(0, 344, 96, 96), Rect2(800, 352, 96, 28)],
 		"map_anchor": Vector2(448, 235),
 		"unlock_rep": 0,
 	},
@@ -31,6 +37,9 @@ const ROOMS := {
 		"pools": [Rect2(201, 253, 524, 145)],
 		"pool_types": ["moon"],
 		"spawns": [Vector2(150, 486), Vector2(448, 496), Vector2(746, 486)],
+		# 池后枯山水白沙带 + 左右雪台
+		"lots": [Rect2(330, 176, 340, 70), Rect2(600, 400, 296, 112),
+			Rect2(0, 400, 84, 112)],
 		"map_anchor": Vector2(448, 80),
 		"unlock_rep": 25,
 	},
@@ -40,6 +49,9 @@ const ROOMS := {
 		"pools": [Rect2(457, 239, 290, 134), Rect2(150, 138, 216, 106)],
 		"pool_types": ["stone", "milk"],
 		"spawns": [Vector2(120, 452), Vector2(430, 470)],
+		# 两池之间的苔地砾石 + 右下石板路；左下木桶台是画好的
+		"lots": [Rect2(60, 250, 300, 110), Rect2(640, 400, 250, 110),
+			Rect2(784, 148, 112, 132)],
 		"map_anchor": Vector2(150, 300),
 		"unlock_rep": 40,
 	},
@@ -49,16 +61,24 @@ const ROOMS := {
 		"pools": [Rect2(212, 221, 430, 154)],
 		"pool_types": ["yuzu"],
 		"spawns": [Vector2(120, 470), Vector2(700, 440)],
+		# 池前木平台 + 右侧木地板 + 右上缘侧走廊；左下角是画好的引水口与石盆
+		"lots": [Rect2(300, 415, 320, 97), Rect2(760, 430, 136, 82),
+			Rect2(800, 212, 96, 96)],
 		"map_anchor": Vector2(690, 300),
 		"unlock_rep": 55,
 	},
 	"chashitsu": {
 		"label": "休息茶室 · 榻榻米",
 		"bg": "res://assets/bg/room-chashitsu.png",
-		"water": false,
+		# 落座房间：客人不下水，盘坐在坐垫上喝茶，两条矩形是座席带而不是池面
+		"kind": "lounge",
 		"pools": [Rect2(120, 372, 270, 100), Rect2(560, 380, 230, 96)],
 		"pool_types": ["tatami", "tatami"],
 		"spawns": [Vector2(150, 494), Vector2(700, 498)],
+		# 中央榻榻米 + 前景板缘的两段（夹在两组座敷与画好的条柜之间）；
+		# 左边的开口是拉门外的庭院，不是地面
+		"lots": [Rect2(400, 300, 160, 210), Rect2(392, 456, 160, 56),
+			Rect2(0, 456, 112, 56)],
 		"map_anchor": Vector2(760, 440),
 		"unlock_rep": 70,
 	},
@@ -72,6 +92,37 @@ func room_cfg(room_id: String) -> Dictionary:
 
 func room_count() -> int:
 	return ROOMS.size()
+
+## 房间玩法：onsen 下水泡汤，lounge 落座喝茶。缺省 onsen。
+func room_kind(room_id: String) -> String:
+	return String(ROOMS.get(room_id, {}).get("kind", "onsen"))
+
+func is_lounge(room_id: String) -> bool:
+	return room_kind(room_id) == "lounge"
+
+## 抽一个本房间招待得起的心愿：心愿所需设施若在这间房里根本没有空地放下，
+## 就不该许给客人——否则这一位天生拿不到满星，玩家也无从补救。
+func pick_wish(room_id: String) -> String:
+	var ids: Array[String] = []
+	for id: String in GameData.WISHES:
+		var fits := true
+		for need: String in GameData.wish_needs(id):
+			if not room_fits(room_id, String(need)):
+				fits = false
+				break
+		if fits:
+			ids.append(id)
+	if ids.is_empty():
+		return "alone"
+	if is_lounge(room_id):
+		# 茶室是坐着消磨时间的地方，先只想喝茶/小睡/闲聊的那些
+		var seated: Array[String] = []
+		for id: String in ids:
+			if GameData.WISH_SEATED.has(id):
+				seated.append(id)
+		if not seated.is_empty():
+			return String(seated.pick_random())
+	return String(ids.pick_random())
 
 ## 昼夜时钟：hour 为 0..24 的浮点时数，按 GameData.DAY_SECONDS 走完一天
 var hour := 9.0
@@ -98,7 +149,8 @@ const SAVE_PATH := "user://save.json"
 const MAX_REPUTATION := 100.0
 const HUD_BOTTOM := 44.0            # 顶栏高度，设施不得压住
 const FACILITY_PAD := 6.0           # 设施之间的最小间距
-const FACILITY_INCOME_PER := 0.05   # 每件设施给本房间泡澡收益 +5%
+const PLACEMENT_GRID := 16.0        # 落点网格：家具底部中心对齐到格点才排得齐
+const FACILITY_INCOME_PER := 0.05   # 每件设施给本房间在席收益 +5%
 const FACILITY_INCOME_MAX := 0.30
 
 func _ready() -> void:
@@ -113,6 +165,7 @@ func _process(delta: float) -> void:
 		day += 1
 		pool_income_today.clear()
 		_reset_day_ledger()
+		_roll_story_day()
 
 func _reset_day_ledger() -> void:
 	today = {"income": 0, "guests": 0, "wishes": 0, "good": 0, "bad": 0, "stars": 0, "by_type": {}}
@@ -164,6 +217,7 @@ func add_review(star_rating: int, good: bool, wish_done := false) -> void:
 	_ledger_add("guests", 1)
 	_ledger_add("stars", star_rating)
 	reputation = clampf(reputation + float(star_rating - 2) * 2.0, 0.0, MAX_REPUTATION)
+	advance_chapter()
 
 ## 图鉴：首次接待到某物种时返回 true，便于弹提示
 func note_species(species_id: String) -> bool:
@@ -224,12 +278,40 @@ func can_place(room_id: String, id: String, center: Vector2) -> bool:
 		var orect := Rect2(Vector2(float(e.x), float(e.y)) - other * 0.5, other)
 		if rect.grow(-FACILITY_PAD).intersects(orect.grow(-FACILITY_PAD)):
 			return false
-	if f.get("wall_only", false):
+	if bool(f.get("wall_only", false)):
+		# 墙上件不占地面 lot，只认墙带高度与单间数量
 		if center.y > wall_limit_y(room_id):
 			return false
-		if facility_count(room_id, id) >= int(f.get("max_count", 99)):
-			return false
-	return true
+		return facility_count(room_id, id) < int(f.get("max_count", 99))
+	# 落地件：整只必须待在背景留空的地面块里，否则会压到画死的木桶毛巾
+	for l: Rect2 in cfg.get("lots", []):
+		if l.encloses(rect):
+			return true
+	return false
+
+## 落点吸附：以底部中心对齐格点，一排家具才站得齐
+func snap_center(id: String, center: Vector2) -> Vector2:
+	var half := Vector2(GameData.facility_size(id)) * 0.5
+	var bx: float = round(center.x / PLACEMENT_GRID) * PLACEMENT_GRID
+	var by: float = round((center.y + half.y) / PLACEMENT_GRID) * PLACEMENT_GRID
+	return Vector2(bx, by - half.y)
+
+## 只看几何：本房间是否存在一块容得下它的空地。忽略金币与已建设施的挤压，
+## 供建造调色板把「这里根本放不下」的选项直接置灰，而不是让玩家反复点击试错。
+func room_fits(room_id: String, id: String) -> bool:
+	var f := GameData.facility(id)
+	if f.is_empty():
+		return false
+	var cfg: Dictionary = ROOMS.get(room_id, {})
+	if cfg.is_empty():
+		return false
+	var size := Vector2(GameData.facility_size(id))
+	if bool(f.get("wall_only", false)):
+		return HUD_BOTTOM + size.y * 0.5 <= wall_limit_y(room_id)
+	for l: Rect2 in cfg.get("lots", []):
+		if l.size.x >= size.x and l.size.y >= size.y:
+			return true
+	return false
 
 func buy_facility(room_id: String, id: String, center: Vector2) -> bool:
 	if not can_place(room_id, id, center):
@@ -241,7 +323,23 @@ func buy_facility(room_id: String, id: String, center: Vector2) -> bool:
 	save_game()
 	return true
 
-## 已建设施给本房间泡澡收益的加成倍率
+## 拆除：落点被限制在地面块里，摆错了得有反悔的口子，退一半钱。
+## grace 给手指留出容差：桌面用 0，触摸端按件放大命中矩形。
+func sell_facility(room_id: String, center: Vector2, grace := 0.0) -> int:
+	var list: Array = room_facilities(room_id)
+	for i in list.size():
+		var e: Dictionary = list[i]
+		var size := Vector2(GameData.facility_size(String(e.id)))
+		var rect := Rect2(Vector2(float(e.x), float(e.y)) - size * 0.5, size).grow(grace)
+		if rect.has_point(center):
+			list.remove_at(i)
+			var refund := int(GameData.facility(String(e.id)).cost) / 2
+			coins += refund
+			save_game()
+			return refund
+	return 0
+
+## 已建设施给本房间在席收益的加成倍率
 func facility_bonus(room_id: String) -> float:
 	return 1.0 + minf(FACILITY_INCOME_MAX, FACILITY_INCOME_PER * room_facilities(room_id).size())
 
@@ -309,7 +407,7 @@ func do_upgrade(room_id: String, index: int) -> bool:
 	save_game()
 	return true
 
-## 池位等级带来的泡澡收益倍率
+## 席位等级带来的在席收益倍率
 func pool_income_mult(room_id: String, index: int) -> float:
 	return GameData.level_income(pool_level(room_id, index))
 
@@ -324,12 +422,261 @@ func budget_for_type(type_id: String) -> int:
 	return best
 
 
+## ---------------- 叙事状态 ----------------
+
+## 每只动物的往来记忆：visits 累计来访、seen_intro 是否已自我介绍、
+## arc_stage 主线阶段、seen 本只已播过的条目 id（同一条不重播）
+var memory := {}
+## 风向情报：[{pool, trend, weight, until}]，读信或闲聊时写入，两天后过期
+var forecast: Array = []
+## 信箱：离店时攒下的信，次日才送达；读过才把 hint 折进风向
+var mailbox: Array = []
+## 已读文案的收藏册：id 全局唯一，读到一条记一条，分母是 Story.line_count()
+var story_log: Array = []
+## 当前章节下标（0 起）；达成 CHAPTERS 门槛后前进，末章封顶
+var chapter := 0
+## 跨天掷出的惊喜事件台词，等下一间房里的玩家来读
+var pending_surprise: Dictionary = {}
+
+const FORECAST_TTL := 2
+const FORECAST_CAP := 6
+const MAILBOX_CAP := 12
+## 离店留信的概率，与网页版一致：熟客也未必留，留了才次日到
+const LETTER_CHANCE := 0.5
+## 跨天有几率撞上一桩店内奇闻
+const SURPRISE_CHANCE := 0.45
+## murmur 的 rare 台词按这个权重降权，稀有句不该比常句还常见
+const RARE_WEIGHT := 0.3
+
+signal mail_arrived(count: int)
+signal chapter_advanced(index: int)
+
+func _memory(sp: String) -> Dictionary:
+	if not memory.has(sp):
+		memory[sp] = {"visits": 0, "seen_intro": false, "arc_stage": 0, "seen": []}
+	return memory[sp]
+
+## 进店记账：arc_stage 沿用网页版公式（满 3 次小成、满 6 次大成），主线台词按它解锁
+func note_visit(sp: String) -> Dictionary:
+	var m := _memory(sp)
+	m.visits = int(m.visits) + 1
+	m.arc_stage = arc_stage(int(m.visits))
+	return m
+
+func arc_stage(visits: int) -> int:
+	return 2 if visits >= 6 else (1 if visits >= 3 else 0)
+
+## 契合度 → 网页版的三档水质评价：对味 perfect、普通 basic、踩雷 wrong
+static func match_quality(aff: int) -> String:
+	return "perfect" if aff > 0 else ("wrong" if aff < 0 else "basic")
+
+## 台词判定上下文：条目 when 里出现的字段一律从这里取
+func story_ctx(sp: String, aff: int) -> Dictionary:
+	var m := _memory(sp)
+	return {"visits": int(m.visits), "arc_stage": int(m.arc_stage), "match": match_quality(aff),
+			"period": String(period().id), "first": not bool(m.seen_intro)}
+
+## when 匹配：数据里目前只有 visitsMin / arcStage / match 三种键，
+## 认得的键逐条比对，认不出的键放行——将来网页版加了新条件也不至于让本作闭嘴。
+static func when_ok(when: Dictionary, ctx: Dictionary) -> bool:
+	if when.has("visitsMin") and int(ctx.visits) < int(when.visitsMin):
+		return false
+	if when.has("visitsMax") and int(ctx.visits) > int(when.visitsMax):
+		return false
+	if when.has("arcStage") and int(ctx.arc_stage) != int(when.arcStage):
+		return false
+	if when.has("match") and String(ctx.match) != String(when.match):
+		return false
+	if when.has("period") and String(ctx.period) != String(when.period):
+		return false
+	if bool(when.get("first", false)) and not bool(ctx.first):
+		return false
+	return true
+
+## 选一条此刻条件成立、且本只还没播过的台词。选不到就返回空字典：
+## 剧情是经营之上的糖，任何一只动物没词可说都不该挡住玩法。
+func pick_line(channel_id: String, sp: String, ctx: Dictionary) -> Dictionary:
+	var m := _memory(sp)
+	var seen: Array = m.seen
+	var candidates: Array = []
+	for e: Dictionary in Story.entries(channel_id, sp):
+		var when: Dictionary = e.get("when", {})
+		if not when.is_empty() and not when_ok(when, ctx):
+			continue
+		if seen.has(String(e.id)):
+			continue
+		candidates.append(e)
+	if candidates.is_empty():
+		# 全播过就重置这一只的记忆，宁可重播也别让店里彻底没了声音
+		seen.clear()
+		return {}
+	var total := 0.0
+	var weights: Array = []
+	for e: Dictionary in candidates:
+		var w := 1.0 if String(e.get("rarity", "common")) == "common" else RARE_WEIGHT
+		weights.append(w)
+		total += w
+	var roll := randf() * total
+	var chosen: Dictionary = candidates[candidates.size() - 1]
+	for i in candidates.size():
+		roll -= float(weights[i])
+		if roll <= 0.0:
+			chosen = candidates[i]
+			break
+	seen.append(String(chosen.id))
+	_log_story(String(chosen.id))
+	return chosen
+
+func _log_story(id: String) -> void:
+	if id == "" or story_log.has(id):
+		return
+	story_log.append(id)
+
+func mark_intro_seen(sp: String) -> void:
+	_memory(sp).seen_intro = true
+
+## 风向写入：置信度折进权重（越没把握的越贴近 1），同池只留最新，两天后过期
+func apply_hint(hint: Dictionary, confidence := 1.0) -> void:
+	if hint.is_empty():
+		return
+	var pool := String(hint.get("pool", ""))
+	if not GameData.POOLS.has(pool):
+		return
+	var w := clampf(1.0 + (float(hint.get("weight", 1.0)) - 1.0) * confidence, 0.5, 2.0)
+	for e in forecast:
+		if String(e.pool) == pool:
+			e.weight = w
+			e.until = day + FORECAST_TTL
+			return
+	forecast.append({"pool": pool, "trend": String(hint.get("trend", "up")), "weight": w,
+			"until": day + FORECAST_TTL})
+	while forecast.size() > FORECAST_CAP:
+		forecast.pop_front()
+
+## 选席倍率：风向只放大契合度，不推翻它——客人不会为了传闻去泡踩雷的汤
+func spawn_weight(type_id: String) -> float:
+	var mult := 1.0
+	for e in forecast:
+		if String(e.pool) == type_id and day <= int(e.until):
+			mult *= float(e.weight)
+	return clampf(mult, 0.6, 2.0)
+
+func forecast_text() -> String:
+	var parts: Array[String] = []
+	for e in forecast:
+		if day > int(e.until):
+			continue
+		var arrow := "↑" if float(e.weight) >= 1.0 else "↓"
+		parts.append("%s %s%.1f" % [String(GameData.pool(String(e.pool)).get("name", e.pool)),
+				arrow, absf(float(e.weight))])
+	return " · ".join(parts)
+
+## 离店留信：只掷五成骰子。网页版的 hintRate 管的是「闲聊那句带不带风向」，
+## 本作风向写在条目自己的 hint 里，所以档案有这个字段也不参与这里的判定。
+## 信先入账本，次日才算送达。
+func post_letter(sp: String, ctx: Dictionary) -> Dictionary:
+	if randf() >= LETTER_CHANCE:
+		return {}
+	var e := pick_line("letter", sp, ctx)
+	if e.is_empty():
+		return {}
+	mailbox.append({"id": String(e.id), "species": sp, "title": String(e.get("title", "一封来信")),
+			"body": String(e.get("body", "")), "day": day + 1, "hint": e.get("hint", {}), "read": false})
+	while mailbox.size() > MAILBOX_CAP:
+		mailbox.pop_front()
+	save_game()
+	return e
+
+func due_mail() -> Array:
+	var list: Array = []
+	for i in mailbox.size():
+		var m: Dictionary = mailbox[i]
+		if not bool(m.read) and day >= int(m.day):
+			list.append(i)
+	return list
+
+## 读信：只有读过之后信里的风向才生效，未读的信不该偷偷改经营数字
+func read_mail(index: int) -> Dictionary:
+	if index < 0 or index >= mailbox.size():
+		return {}
+	var m: Dictionary = mailbox[index]
+	if bool(m.read) or day < int(m.day):
+		return {}
+	m.read = true
+	var profile := Story.profile(String(m.species))
+	apply_hint(m.hint, float(profile.get("confidence", 0.8)))
+	_log_story(String(m.id))
+	save_game()
+	return m
+
+## 跨天：过期风向清掉，到期的信报一次数，再掷一次店内奇闻
+func _roll_story_day() -> void:
+	var alive: Array = []
+	for e in forecast:
+		if day <= int(e.until):
+			alive.append(e)
+	forecast = alive
+	var n := due_mail().size()
+	if n > 0:
+		mail_arrived.emit(n)
+	_roll_surprise()
+
+## 惊喜台词先攒着：跨天也许正站在案内图，那儿没有对白卡可以播
+func _roll_surprise() -> void:
+	if not pending_surprise.is_empty() or randf() >= SURPRISE_CHANCE:
+		return
+	var ids: Array = Story.event_ids()
+	ids.shuffle()
+	for id: String in ids:
+		# 逐个试：pick_line 会替我们把播光的事件跳过，比先算剩余条数省事
+		var e := pick_line("surprise", id, story_ctx(id, 0))
+		if not e.is_empty():
+			pending_surprise = e
+			return
+
+## 网页版的道具按「动作」取名，本作按设施取名，两边就近对上同一件物：
+## 修剪→盆栽，祈愿→石灯笼，眺望→相机，补货→贩卖机，开席→长凳，喂茶→茶炉。
+## 只剩水桶没有对应文本，点它就不出声，不硬凑。
+const PROP_BY_FACILITY := {
+	"plant": "trim", "lantern": "pray", "camera": "gaze",
+	"vender": "restock", "bench": "feast", "tea": "feed",
+}
+
+## 空手点设施：读一段它的故事。ctx 仍走 story_ctx，
+## 免得哪天道具文本加了 when 条件，空字典会让取值当场炸
+func prop_line(facility_id: String) -> Dictionary:
+	var prop_id := String(PROP_BY_FACILITY.get(facility_id, ""))
+	if prop_id == "":
+		return {}
+	return pick_line("prop", prop_id, story_ctx(prop_id, 0))
+
+## 主线阶梯：门槛只用本作已有的经营事实（累计接待 + 店铺星级），达成即推进
+func chapter_now() -> Dictionary:
+	return Story.CHAPTERS[clampi(chapter, 0, Story.CHAPTERS.size() - 1)]
+
+func chapter_goal() -> String:
+	var c := chapter_now()
+	return "累计接待 %d/%d · 店铺 %d/%d 星" % [reviews_total, int(c.guests), shop_stars(), int(c.star)]
+
+func advance_chapter() -> void:
+	var moved := false
+	while chapter < Story.CHAPTERS.size() - 1:
+		var c: Dictionary = Story.CHAPTERS[chapter]
+		if reviews_total < int(c.guests) or shop_stars() < int(c.star):
+			break
+		chapter += 1
+		moved = true
+	if moved:
+		chapter_advanced.emit(chapter)
+
 func save_game() -> void:
 	var data := {
 		"coins": coins, "day": day, "hour": hour,
 		"reputation": reputation, "reviews_total": reviews_total,
 		"reviews_good": reviews_good, "wishes_done": wishes_done, "codex": codex,
 		"facilities": facilities, "pool_levels": pool_levels,
+		"memory": memory, "forecast": forecast, "mailbox": mailbox,
+		"story_log": story_log, "chapter": chapter,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
@@ -377,8 +724,48 @@ func load_game() -> void:
 			list.append(clampi(int(v), 1, max_pool_level()))
 		pool_levels[room_id] = list
 		_ensure_levels(room_id)
+	_load_story(data)
+
+## 存档里的数字回读全是浮点，按各自的键还原成 int/bool；
+## 物种或汤种已经不存在的那条直接丢弃，免得拿着查不到表的键去选台词。
+func _load_story(data: Dictionary) -> void:
+	memory.clear()
+	var saved_mem: Dictionary = data.get("memory", {})
+	for sp: String in saved_mem:
+		if not GameData.SPECIES.has(sp):
+			continue
+		var raw: Dictionary = saved_mem[sp]
+		var seen_list: Array = []
+		for v: Variant in raw.get("seen", []):
+			seen_list.append(String(v))
+		memory[sp] = {"visits": int(raw.get("visits", 0)), "seen_intro": bool(raw.get("seen_intro", false)),
+				"arc_stage": int(raw.get("arc_stage", 0)), "seen": seen_list}
+	forecast.clear()
+	for e: Variant in data.get("forecast", []):
+		var item: Dictionary = e
+		var pool := String(item.get("pool", ""))
+		if not GameData.POOLS.has(pool):
+			continue
+		forecast.append({"pool": pool, "trend": String(item.get("trend", "up")),
+				"weight": float(item.get("weight", 1.0)), "until": int(item.get("until", day))})
+	mailbox.clear()
+	for e: Variant in data.get("mailbox", []):
+		var item: Dictionary = e
+		var sp := String(item.get("species", ""))
+		if not GameData.SPECIES.has(sp):
+			continue
+		mailbox.append({"id": String(item.get("id", "")), "species": sp,
+				"title": String(item.get("title", "一封来信")), "body": String(item.get("body", "")),
+				"day": int(item.get("day", day)), "hint": item.get("hint", {}),
+				"read": bool(item.get("read", false))})
+	story_log.clear()
+	for v: Variant in data.get("story_log", []):
+		story_log.append(String(v))
+	chapter = clampi(int(data.get("chapter", 0)), 0, Story.CHAPTERS.size() - 1)
 
 const BAR_COLOR := Color(0.09, 0.06, 0.13, 0.62)
+## 触摸端最小命中高度：896 宽的画面投到手机上，26 高的按钮只剩十来物理像素
+const TOUCH_BUTTON_HEIGHT := 36.0
 
 func style_button(button: Button) -> void:
 	var base := StyleBoxFlat.new()
@@ -403,6 +790,8 @@ func style_button(button: Button) -> void:
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.99, 0.92, 1.0))
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.66, 1.0))
 	button.add_theme_font_size_override("font_size", 14)
+	if button.custom_minimum_size.y < TOUCH_BUTTON_HEIGHT:
+		button.custom_minimum_size.y = TOUCH_BUTTON_HEIGHT
 
 ## ---------------- 房间解锁 ----------------
 

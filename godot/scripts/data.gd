@@ -21,15 +21,15 @@ const PERIODS := [
 ]
 
 ## ear: round|point|long|antler|none   tail: stub|curl|fluffy|flat|fin|none
-## likes 为偏好汤种（契合+），dislike 为讨厌汤种（契合-）
+## likes 为偏好席位（契合+，含茶室榻榻米），dislike 为讨厌的汤种（契合-）
 const SPECIES := {
 	"capy": {"name": "水豚", "ear": "round", "tail": "stub", "size": 1.18,
 		"body": "#b07a3e", "belly": "#e2c290", "dark": "#6f4a20",
-		"likes": ["hot", "herb"], "dislike": "ice", "pay": 14, "perso": "温吞哲学派",
+		"likes": ["hot", "herb", "tatami"], "dislike": "ice", "pay": 14, "perso": "温吞哲学派",
 		"names": ["墩墩", "慢郎", "柚柚子", "石石", "温泉守"]},
 	"rabb": {"name": "兔子", "ear": "long", "tail": "curl", "size": 0.92,
 		"body": "#efe3da", "belly": "#fffaf4", "dark": "#b09a8e",
-		"likes": ["milk", "moon"], "dislike": "cyber", "pay": 10, "perso": "软乎乎胆小鬼",
+		"likes": ["milk", "moon", "tatami"], "dislike": "cyber", "pay": 10, "perso": "软乎乎胆小鬼",
 		"names": ["雪团", "糯米", "月见", "小跳", "棉花"]},
 	"cat3": {"name": "三花猫", "ear": "point", "tail": "curl", "size": 0.95,
 		"body": "#f0a95f", "belly": "#fff3e2", "dark": "#8a5a2a", "patch": "#3a3a3a",
@@ -65,7 +65,7 @@ const SPECIES := {
 		"names": ["漂漂", "贝壳", "小捞", "转转", "海藻"]},
 	"deer": {"name": "小鹿", "ear": "antler", "tail": "stub", "size": 1.1,
 		"body": "#c88a4e", "belly": "#f4e0c0", "dark": "#7a4e22", "spots": true,
-		"likes": ["herb", "moon"], "dislike": "cyber", "pay": 15, "perso": "林间贵客",
+		"likes": ["herb", "moon", "tatami"], "dislike": "cyber", "pay": 15, "perso": "林间贵客",
 		"names": ["斑斑", "铃兰", "小角", "晨露", "枫叶"]},
 	"frog": {"name": "青蛙", "ear": "none", "tail": "none", "size": 0.82,
 		"body": "#6abf5a", "belly": "#d8f0c8", "dark": "#3a7a2e",
@@ -77,7 +77,7 @@ const SPECIES := {
 		"names": ["刺刺", "团团", "慢慢", "独独", "小栗"]},
 	"rpnd": {"name": "小熊猫", "ear": "round", "tail": "fluffy", "size": 0.96,
 		"body": "#d06a3a", "belly": "#f4d8b8", "dark": "#5a2e16", "ring": true, "cheek": true,
-		"likes": ["herb", "yuzu"], "dislike": "ice", "pay": 13, "perso": "树梢上的午睡派",
+		"likes": ["herb", "yuzu", "tatami"], "dislike": "ice", "pay": 13, "perso": "树梢上的午睡派",
 		"names": ["红叶", "竹竹", "睡睡", "暖绒", "九圈"]},
 	"seal": {"name": "海豹", "ear": "none", "tail": "fin", "size": 1.05,
 		"body": "#8aa8c0", "belly": "#e8f4fa", "dark": "#4a6a84", "whisk": true,
@@ -87,6 +87,26 @@ const SPECIES := {
 		"body": "#f4f0e8", "belly": "#fff8f0", "dark": "#3a3a44", "horn": true, "spots2": true,
 		"likes": ["milk", "hot"], "dislike": "ice", "pay": 15, "perso": "慢悠悠的奶香鉴赏家",
 		"names": ["哞哞", "奶盖", "花斑", "青团", "慢慢"]},
+	## 以下四只随剧情接入补入：偏好沿用网页版的水色（冷泉/玫瑰/泥浴/气泡泉）
+	"panda": {"name": "熊猫", "ear": "round", "tail": "stub", "size": 1.2,
+		"body": "#efeade", "belly": "#fdfbf4", "dark": "#2c2a2f",
+		"mask": true, "mask_eye": "#f6f3ea", "ear_dark": true,
+		"likes": ["ice", "moss"], "dislike": "cyber", "pay": 16, "perso": "退休气象员",
+		"names": ["云竹", "阿蒙", "晴雨", "团团子", "北北"]},
+	"mouse": {"name": "老鼠", "ear": "round", "tail": "curl", "size": 0.74,
+		"body": "#b7b0a8", "belly": "#eae3da", "dark": "#6b6058",
+		"likes": ["yuzu", "cyber"], "dislike": "moss", "pay": 9, "perso": "巷口跑腿的",
+		"names": ["吱吱", "米粒", "线线", "阿顺", "小跑"]},
+	"pig": {"name": "小猪", "ear": "point", "tail": "curl", "size": 1.08,
+		"body": "#eba6a6", "belly": "#fbd9d4", "dark": "#a95f66",
+		"cheek": true, "snout": "#e08d94",
+		"likes": ["sand", "hot"], "dislike": "ice", "pay": 11, "perso": "吃饱就睡",
+		"names": ["哼哼", "噜噜", "土豆", "年糕", "泥泥"]},
+	"chick": {"name": "小鸡", "ear": "none", "tail": "none", "size": 0.78,
+		"body": "#ffe066", "belly": "#fff6c4", "dark": "#c99a2e",
+		"beak": "#ff9a3a", "comb": true,
+		"likes": ["cyber", "yuzu"], "dislike": "ice", "pay": 8, "perso": "到处认门",
+		"names": ["叽叽", "豆芽", "绒毛", "噗噗", "桃子"]},
 }
 
 ## 汤种：cap 为池位容量，coin_gen 决定是否直接产币，daily_cap 为该汤种单日产币上限，solo 表示只接待一位
@@ -137,7 +157,7 @@ const FACILITIES := {
 const FACILITY_IDS := ["lantern", "bench", "vender", "camera", "plant", "bucket", "tea"]
 const DISPLAY_SCALE := 2
 
-## 池位扩建：每升一级多一个位、泡澡收益与单日投币额度同步放大
+## 席位扩建：每升一级多一个位、在席收益与单日投币额度同步放大
 const UPGRADE := {
 	"max_level": 3, "base_cost": 120, "cost_step": 1.6,
 	"cap_per_level": 1, "income_per_level": 0.18, "budget_per_level": 0.5,
@@ -147,10 +167,13 @@ const UPGRADE := {
 const WISHES := {
 	"snack": {"label": "想吃零食", "need": "vender", "fame": 3, "coin": 6},
 	"photo": {"label": "想拍照", "need": "camera", "fame": 3, "coin": 5},
+	"tea": {"label": "想喝茶", "need": "tea", "fame": 3, "coin": 5},
 	"alone": {"label": "想独处", "fame": 2, "coin": 4},
 	"chat": {"label": "想聊天", "fame": 2, "coin": 4},
 	"nap": {"label": "想小睡", "need": ["bench", "tea"], "fame": 2, "coin": 4},
 }
+## 坐着消磨时间才完成得了的心愿：茶室客人只会许这些
+const WISH_SEATED := ["tea", "nap", "chat", "alone"]
 
 const REVIEW_LINES := [
 	"汤很暖，下次还来。",
@@ -161,6 +184,14 @@ const REVIEW_LINES := [
 	"心愿达成了，今天圆满。",
 	"差点意思，想泡的池没排上。",
 	"灯影很好看，记了一路。",
+]
+## 茶室客人不下水，点评里自然也不该抱怨池子排不上
+const REVIEW_LINES_LOUNGE := [
+	"麦茶是热的，榻榻米也是。",
+	"坐了一下午，什么都没想。",
+	"团子很软，下次带朋友来。",
+	"这里安静，耳朵终于不响了。",
+	"坐垫偏硬，膝盖到现在还麻。",
 ]
 
 static func species_ids() -> Array:
