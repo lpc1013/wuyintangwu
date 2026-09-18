@@ -96,7 +96,9 @@ func _process(_delta: float) -> bool:
 			paused = false
 	if frame == TOUCH_FRAME and current_scene.has_method("_toggle_build"):
 		_drive_touch(gm)
-	if frame == STORY_FRAME and current_scene.has_method("_on_guest_chat"):
+	# 某一帧上可能恰好没有一个点得着的客人：整条叙事链按拍重试，直到四段都记到
+	if frame >= STORY_FRAME and frame % 24 == 0 and not _story_done() \
+			and current_scene.has_method("_on_guest_chat"):
 		_drive_story(gm)
 	if not saw_bubble:
 		for g in get_nodes_in_group("guests"):
@@ -210,6 +212,16 @@ func _drive_story(gm: Node) -> void:
 		current_scene._toggle_build()
 	current_scene._select_build("")
 	_clear_lines()
+	if not chat_logged:
+		_drive_chat(gm)
+	_drive_props(gm)
+	_drive_mail(gm)
+
+## 四段都记到了就收手：后面那一千多帧要留给客人自己冒泡
+func _story_done() -> bool:
+	return chat_logged and chat_card_shown and chat_card_cleared and prop_read and mail_closed
+
+func _drive_chat(gm: Node) -> void:
 	for g: Node2D in get_nodes_in_group("guests"):
 		# 头点太靠上的那几位会被顶栏吃掉，点击根本到不了房间
 		if g.position.y - 36.0 <= 60.0:
@@ -227,8 +239,24 @@ func _drive_story(gm: Node) -> void:
 				_click(blank)
 				chat_card_cleared = not bool(current_scene.story_showing)
 		break
-	_drive_props(gm)
-	_drive_mail(gm)
+
+## 空点已建成的家具：读到的必须是 prop- 开头那条，而不是顺路又撩了个客人。
+## 逐件试：客人常挤在家具边上，那一下会被优先判成闲聊，只有 chat-/prop- 分得清才算读到了故事
+func _drive_props(gm: Node) -> void:
+	if prop_read:
+		return
+	for sp: Sprite2D in current_scene.facility_nodes:
+		var pos: Vector2 = sp.position
+		if String(current_scene._facility_at(pos)) == "":
+			continue
+		_clear_lines()
+		var before := int(gm.story_log.size())
+		_click(pos)
+		if int(gm.story_log.size()) > before and _last_story(gm).begins_with("prop-"):
+			prop_read = true
+			# 读完就把卡片收掉：挂着它，之后整场都不会再有头顶气泡
+			_clear_lines()
+			return
 
 ## 把挂着与排队的台词都清干净：否则下一次点击是替上一句翻页，不是玩家要做的那个动作
 func _clear_lines() -> void:
@@ -243,21 +271,9 @@ func _blank_spot() -> Vector2:
 			return p
 	return Vector2.INF
 
-## 空点已建成的家具：读到的必须是 prop- 开头那条，而不是顺路又撩了个客人。
-## 逐件试：客人常挤在家具边上，那一下会被优先判成闲聊，只有 chat-/prop- 分得清才算读到了故事
-func _drive_props(gm: Node) -> void:
-	for sp: Sprite2D in current_scene.facility_nodes:
-		var pos: Vector2 = sp.position
-		if String(current_scene._facility_at(pos)) == "":
-			continue
-		_clear_lines()
-		var before := int(gm.story_log.size())
-		_click(pos)
-		if int(gm.story_log.size()) > before and _last_story(gm).begins_with("prop-"):
-			prop_read = true
-			return
-
 func _drive_mail(gm: Node) -> void:
+	if mail_panel_opened and mail_closed:
+		return
 	gm.forecast.clear()
 	gm.mailbox.clear()
 	# 合成一封今天就到期、且带着风向的信：实机那五成骰子不该是断言的前提
