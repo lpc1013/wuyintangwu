@@ -263,9 +263,11 @@ func _seed_mail() -> void:
 ## 气泡贴在泡定在池里的客人头顶才看得出位置：STAY 是唯一人坐定在汤里的状态
 func _try_bubble() -> void:
 	# 4.7 把 get_nodes_in_group 挪到了 SceneTree 上，current_scene（Control）已经没有这个方法
-	if current_scene.story_card.visible and frame % 24 == 0:
-		# 截图时没人点「继续」，得替玩家把对白翻过去，否则卡片一直占着位、气泡永远出不来
-		current_scene._advance_line()
+	if current_scene.story_card.visible:
+		# 挂着台词时 _bubble 自己就该噤声，这里跟着整帧让路；每 24 帧替玩家翻一页，
+		# 否则没人点「继续」，卡片能一直占到收钟
+		if frame % 24 == 0:
+			current_scene._advance_line()
 		return
 	if current_scene._bubble_left > 0.0:
 		return
@@ -279,6 +281,9 @@ func _try_bubble() -> void:
 		if text.strip_edges() == "":
 			continue
 		current_scene._bubble(g, text, String(line.get("bubbleStyle", "")) == "glow")
+		# 真挂上了才算截到：_bubble 还会因台词挂着而噤声，只看这一行调用会谎报
+		if current_scene.bubble_label == null:
+			continue
 		bubble_done = true
 		wait_frames = frame + 2
 		print("BUBBLE on ", sp, " at ", g.position, " ", text)

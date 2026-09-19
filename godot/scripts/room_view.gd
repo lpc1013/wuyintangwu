@@ -48,6 +48,8 @@ const STORY_HEIGHT := 128.0
 ## 排队上限：客人一批涌进来时宁可少说两句，也不让对白卡变成挡操作的一堵墙
 const STORY_QUEUE_MAX := 3
 const BUBBLE_SECONDS := 3.6
+## 气泡相对客人脚边的头顶偏移：挂 HUD 之后每帧按这个贴一次
+const BUBBLE_OFFSET := Vector2(-70, -104)
 ## 手指点客人的命中半径：精灵只有 32~38 宽，按脚边算会点十次中不了三次
 const GUEST_TAP_RADIUS := 44.0
 ## 金币飘字：HUD 那个数字跳一下，玩家看不出钱是谁给的、这笔又花在了哪
@@ -57,8 +59,6 @@ const FLOAT_RISE := 36.0
 const FLOAT_MAX := 7
 const INCOME_TINT := Color(1.0, 0.87, 0.42)
 const COST_TINT := Color(1.0, 0.58, 0.5)
-## 盖在客人之上（客人 z 跟脚边 y 走，最高约 512），又得让弹窗压得住它
-const FLOAT_Z := 900
 
 ## 池面热气：一团从水面生出来，边往上飘边涨开、淡掉。浓淡由汤种的 steam 档决定，
 ## 冰泉与茶席那档是 0——冷水冒热气会直接说错话，所以宁可不画。
@@ -76,7 +76,14 @@ const STEAM_TINT := Color(0.95, 0.96, 1.0)
 ## 而 toast 只有一个格子，一条点评会把「谁留了信」那类要玩家记住的提示顶掉。
 ## 客人最后是在画面外的门口消失的，浮标挂不到他身上，只能钉在这条谁都不挡的带上。
 const REVIEW_SECONDS := 3.4
-const REVIEW_Y := 46.0
+## 顶栏下方留这一截再起条：位置由顶栏实际高度推出来，别写死——
+## 写死的话谁把顶栏加高一点，这条带就无声滑到顶栏底下去了
+const REVIEW_GAP := 6.0
+const REVIEW_HEIGHT := 22.0
+## 底衬比字各留一点呼吸，紧贴字边的方框很寒碜
+const REVIEW_PLATE_PAD := 10.0
+## 与顶栏那块板子同色同透明度：一条带是设计，两条带颜色不同就是没对齐
+const REVIEW_PLATE_TINT := Color(0.09, 0.06, 0.13, 0.62)
 const REVIEW_GOOD_TINT := Color(1.0, 0.85, 0.42)
 const REVIEW_MID_TINT := Color(0.86, 0.84, 0.92)
 const REVIEW_BAD_TINT := Color(1.0, 0.52, 0.46)
@@ -141,13 +148,21 @@ var steam_pools: Array[int] = []
 var _steam_acc: Array[float] = []
 ## 顶栏下方那条点评：全场只有一条，新点评把旧的顶掉，不做队列
 var review_line: Label
+## 文字底下那块贴字宽度的暗底衬，作为 Label 的子节点跟着字一起淡
+var review_plate: ColorRect
 var _review_left := 0.0
+## 飘字、点评条与气泡共用的那一层：夜罩是 layer 5 的整片蓝，留在房间画布里的字入夜都会被染糊
+var hud: CanvasLayer
+## 气泡挪到 HUD 后不再天然跟着客人走，只能每帧按宿主位置换算一次
+var bubble_label: Label
+var bubble_host: Node2D
 
 func _ready() -> void:
 	cfg = GameManager.ROOMS.get(GameManager.current_room, {})
 	if cfg.is_empty():
 		push_error("当前房间无配置: " + GameManager.current_room)
 		return
+	hud = get_node("HUD")
 	%BG.texture = load(cfg.bg)
 	%RoomLabel.text = cfg.label
 	%LayoutOverlay.visible = false
@@ -281,6 +296,7 @@ func _process(delta: float) -> void:
 			%Toast.text = ""
 	if _bubble_left > 0.0:
 		_bubble_left -= delta
+		_sync_bubble()
 	_update_review(delta)
 	_update_steam(delta)
 	_update_floats(delta)
@@ -297,9 +313,9 @@ func _float_text(pos: Vector2, text: String, tint: Color) -> void:
 	l.add_theme_color_override("font_color", tint)
 	l.add_theme_color_override("font_outline_color", Color(0.12, 0.07, 0.16, 0.92))
 	l.add_theme_constant_override("outline_size", 4)
-	l.z_index = FLOAT_Z
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(l)
+	## 挂到 HUD 才躲得开夜罩。HUD 没设自己的变换，坐标与房间画布重合，落点算法照旧
+	hud.add_child(l)
 	# 没进树就量不到字宽（主题还没拿到），只能先挂上去再往左挪半个字
 	l.position = pos - Vector2(l.get_minimum_size().x * 0.5, 0)
 	floats.append({"node": l, "from": pos, "t": 0.0})
@@ -322,8 +338,8 @@ func _update_floats(delta: float) -> void:
 ## 它顶的本来就是 toast，而 toast 一直就在 HUD 上。
 func _build_review() -> void:
 	review_line = Label.new()
-	review_line.position = Vector2(0, REVIEW_Y)
-	review_line.size = Vector2(GameManager.VIEWPORT_SIZE.x, 22)
+	review_line.size = Vector2(GameManager.VIEWPORT_SIZE.x, REVIEW_HEIGHT)
+	review_line.position = Vector2(0, _review_band_y())
 	review_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	review_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	## 挂上去但不接点击：那条带正压在客人入场路上，接了会把人挡住
@@ -332,8 +348,21 @@ func _build_review() -> void:
 	review_line.add_theme_constant_override("outline_size", 5)
 	review_line.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.92))
 	review_line.visible = false
-	var hud: CanvasLayer = get_node("HUD")
+	## 底衬挂在 Label 底下并 show_behind_parent：它自动跟着字一起露面、一起淡出，
+	## 不用在两处同步 visible 与 modulate
+	var plate := ColorRect.new()
+	plate.color = REVIEW_PLATE_TINT
+	plate.show_behind_parent = true
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	review_line.add_child(plate)
+	review_plate = plate
 	hud.add_child(review_line)
+
+## 顶栏多高就从多下面起条。只读 offset_bottom 不读 size——
+## 自检里房间刚进树还没排版，size 是 0
+func _review_band_y() -> float:
+	var bar: Control = hud.get_node("TopBarBG")
+	return float(bar.offset_bottom) + REVIEW_GAP
 
 ## 星级分色：四星以上烫金，三星中性，两星以下发馊的红。
 ## 抽成 static 是为了让校验脚本不建房间也能问到同一张色表
@@ -351,26 +380,32 @@ func _review_stamp(who: String, stars: int, line: String, rep_delta: float,
 			"✓" if wish_done else "✗", wish_label, rep_delta]
 	review_line.add_theme_color_override("font_color", review_tint(stars))
 	review_line.modulate.a = 1.0
+	## 底衬贴着字宽走：整条铺满 896 会变成第二条顶栏，比字宽一点点才像给这句话垫的
+	## 没进树量不到字宽（主题还没拿到），所以只能写完字再算
+	var tw := float(review_line.get_minimum_size().x)
+	var band_w := minf(tw + REVIEW_PLATE_PAD * 2.0, float(GameManager.VIEWPORT_SIZE.x))
+	review_plate.position = Vector2((float(GameManager.VIEWPORT_SIZE.x) - band_w) * 0.5, 0)
+	review_plate.size = Vector2(band_w, REVIEW_HEIGHT)
 	_review_left = REVIEW_SECONDS
 	_sync_review()
 
-## 面板开着时点评条必须让位：它挂在 HUD 上，盖得住结算也盖得住信箱。
-## 抽出来是因为面板开、面板关两处都要同步一次，而结算期间整棵树暂停，
-## _process 根本不会跑，只靠 _update_review 每帧刷是刷不到的。
+## 有剩余时长、且没有面板压着，才准露面。抽出来是因为面板开、面板关两处都要同步一次，
+## 而结算期间整棵树暂停，_process 根本不会跑，只靠 _update_review 每帧刷是刷不到的。
 func _sync_review() -> void:
-	if _review_left > 0.0:
-		review_line.visible = not _modal_up()
+	review_line.visible = _review_left > 0.0 and not _modal_up()
 
 ## 前段整条钉住给人读完，只剩尾段才开始淡；读完直接隐掉，挂一张透明 Label 没意义
 func _update_review(delta: float) -> void:
 	if _review_left <= 0.0:
 		return
-	_review_left -= delta
-	if _review_left <= 0.0:
-		review_line.visible = false
+	## 面板开着时连表一起冻住：信箱不暂停树，照旧走表等于让玩家在读信的那几秒
+	## 悄悄烧掉一条点评；结算面板本来就暂停，两条让位路径得是同一个行为
+	if _modal_up():
+		_sync_review()
 		return
-	_sync_review()
+	_review_left -= delta
 	review_line.modulate.a = clampf(_review_left / (REVIEW_SECONDS * REVIEW_FADE_TAIL), 0.0, 1.0)
+	_sync_review()
 
 ## 只有真冒热气的池子配计时器；初相随机错开，免得两口池同一帧一起喷一团。
 func _build_steam() -> void:
@@ -885,7 +920,6 @@ func _bubble(g: Node2D, text: String, glow := false) -> void:
 	_bubble_left = BUBBLE_SECONDS
 	var label := Label.new()
 	label.text = text
-	label.position = Vector2(-70, -104)
 	label.size = Vector2(140, 40)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -895,13 +929,28 @@ func _bubble(g: Node2D, text: String, glow := false) -> void:
 	label.add_theme_constant_override("outline_size", 4)
 	label.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.9))
 	label.add_theme_color_override("font_color", Color(0.72, 0.95, 1.0) if glow else Color(1.0, 0.96, 0.86))
-	## 气泡挂在客人身上，z 也跟着客人按脚边算——不抬起来的话，下面那位一走过就把台词挡住了
-	label.z_index = 400
-	g.add_child(label)
+	## 挂到 HUD 才躲得开夜罩。原来挂在客人身上还要把 z 抬到 400，免得下面那位一走过
+	## 就把台词挡住；整层提到画面之上以后，挡无可挡，那句抬升也就不需要了
+	hud.add_child(label)
+	bubble_label = label
+	bubble_host = g
+	_sync_bubble()
 	var tw := label.create_tween()
 	tw.tween_interval(BUBBLE_SECONDS * 0.55)
 	tw.tween_property(label, "modulate:a", 0.0, BUBBLE_SECONDS * 0.45)
-	tw.tween_callback(label.queue_free)
+	tw.tween_callback(func() -> void:
+		# 只清自己这一颗：新旧交接差一帧时，旧气泡的收尾不许把刚接上的那颗摘掉
+		if bubble_label == label:
+			bubble_label = null
+			bubble_host = null
+		label.queue_free())
+
+## 气泡挪到 HUD 上就不再天然跟着客人走，只能每帧把宿主位置贴过来。
+## 客人半路离店会被回收，那一种 bubble_host 已经不在树上，只能问一句还活着没
+func _sync_bubble() -> void:
+	if bubble_label == null or bubble_host == null or not is_instance_valid(bubble_host):
+		return
+	bubble_label.position = bubble_host.position + BUBBLE_OFFSET
 
 static func _flat(entry: Dictionary) -> String:
 	var parts: Array[String] = []

@@ -216,6 +216,23 @@ func _run_checks() -> int:
 				if hud == null or veil == null or int(hud.layer) <= int(veil.layer):
 					printerr("FAIL 点评条压不进夜罩之上: hud=", hud, " veil=", veil)
 					failures += 1
+				# 起点是从顶栏实际高度推出来的，不是写死的 46：顶栏加高不许把这条带压到底下
+				var top_bar: Control = room.get_node("HUD/TopBarBG")
+				if float(stamp.position.y) < float(top_bar.offset_bottom):
+					printerr("FAIL 点评条滑进顶栏底下了: y=", stamp.position.y,
+							" 顶栏高=", top_bar.offset_bottom)
+					failures += 1
+				# 底衬垫在字后面、还得盖得住字：比字还窄就等于没垫
+				var plate: ColorRect = room.get("review_plate")
+				if plate == null:
+					printerr("FAIL 点评条没有底衬")
+					failures += 1
+				elif not bool(plate.show_behind_parent) or plate.get_parent() != stamp:
+					printerr("FAIL 底衬没垫在字后面")
+					failures += 1
+				elif float(plate.size.x) < stamp.get_minimum_size().x:
+					printerr("FAIL 底衬比字还窄: ", plate.size.x, " < ", stamp.get_minimum_size().x)
+					failures += 1
 				# 挪到 HUD 上就盖得住结算与信箱，只能自己让位——照对白卡那套开合序列走一遍
 				room.call("_review_stamp", "阿橘", 5, "汤很暖，下次还来。", 6.0, "想安静", true)
 				room.call("_on_day_reported", {"day": 3, "guests": 1, "income": 10, "wishes": 1,
@@ -231,9 +248,11 @@ func _run_checks() -> int:
 				if stamp.visible:
 					printerr("FAIL 信箱开着，点评条还压着信")
 					failures += 1
+				# 让位期间连表一起冻住：信箱不暂停树，照旧走表等于让玩家读封信的功夫烧掉一条点评
+				room.call("_update_review", float(room.get("REVIEW_SECONDS")) + 1.0)
 				room.call("_toggle_mail")
 				if not stamp.visible:
-					printerr("FAIL 信箱关掉后点评条没回来")
+					printerr("FAIL 读信期间把点评条走没了")
 					failures += 1
 				room.call("_update_review", float(room.get("REVIEW_SECONDS")) + 0.1)
 				if stamp.visible:
@@ -241,6 +260,57 @@ func _run_checks() -> int:
 					failures += 1
 				if failures == before_fail:
 					print("OK review: indoor 点评条钉得上、分得出色、压在夜罩之上、面板开着会让位")
+			# 飘字与头顶气泡跟点评条同病：留在房间画布里就会被夜罩染暗，这次一并抬到 HUD
+			var lift_fail := failures
+			var layer: CanvasLayer = room.get("hud")
+			room.call("_float_text", Vector2(200, 300), "+30", Color(1.0, 1.0, 1.0))
+			var fl: Array = room.get("floats")
+			var flop: Node = (fl[fl.size() - 1] as Dictionary).node
+			if flop.get_parent() != layer:
+				printerr("FAIL 飘字还留在房间画布里: ", flop.get_parent())
+				failures += 1
+			# 气泡有守卫：挂着台词时本该噤声，不清干净就测不到抬层这一步
+			room.set("story_showing", false)
+			room.set("story_queue", [])
+			room.set("_bubble_left", 0.0)
+			room.call("_sync_story_card")
+			var pal := Node2D.new()
+			room.add_child(pal)
+			pal.position = Vector2(120, 260)
+			var off: Vector2 = room.get("BUBBLE_OFFSET")
+			room.call("_bubble", pal, "水有点烫")
+			var bub: Label = room.get("bubble_label")
+			if bub == null:
+				printerr("FAIL 气泡没贴出来")
+				failures += 1
+			elif bub.get_parent() != layer:
+				printerr("FAIL 气泡还挂在客人身上: ", bub.get_parent())
+				failures += 1
+			# 挂 HUD 就不再生在客人身上，位置得靠每帧贴；漏了这一步气泡会钉在原地
+			elif bub.position != Vector2(120, 260) + off:
+				printerr("FAIL 气泡没贴到客人头顶: ", bub.position)
+				failures += 1
+			else:
+				pal.position = Vector2(300, 200)
+				room.call("_sync_bubble")
+				if bub.position != Vector2(300, 200) + off:
+					printerr("FAIL 客人走开气泡没跟上: ", bub.position)
+					failures += 1
+			# 交接那一帧：第二颗必须换成新宿主，旧气泡的收尾不许把刚接上的那颗摘掉
+			var pal2 := Node2D.new()
+			room.add_child(pal2)
+			pal2.position = Vector2(500, 320)
+			room.set("_bubble_left", 0.0)
+			room.call("_bubble", pal2, "换人了")
+			var bub2: Label = room.get("bubble_label")
+			if room.get("bubble_host") != pal2 or bub2 == bub:
+				printerr("FAIL 新气泡没接上新宿主")
+				failures += 1
+			elif bub2.position != Vector2(500, 320) + off:
+				printerr("FAIL 新气泡没贴到新宿主头顶: ", bub2.position)
+				failures += 1
+			if failures == lift_fail:
+				print("OK lift: indoor 飘字与气泡抬到夜罩之上，气泡跟着客人走")
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)

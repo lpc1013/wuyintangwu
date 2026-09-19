@@ -43,6 +43,13 @@ var saw_income_float := false
 var saw_cost_float := false
 var saw_steam := false
 var saw_review := false
+## 点评条那串「声望 ±N」是否就是实际到账数：靠每帧的声望与点评数变化对账
+var review_delta_ok := false
+var review_cap_ok := false
+var rep_prev := 0.0
+var reviews_prev := 0
+## 借位造封顶样本时存下的原值；负数表示这一场还没借过
+var rep_pinned := -1.0
 var visits_untracked := 0
 var chat_logged := false
 var chat_card_shown := false
@@ -102,10 +109,9 @@ func _process(_delta: float) -> bool:
 			and current_scene.has_method("_on_guest_chat"):
 		_drive_story(gm)
 	if not saw_bubble:
-		for g in get_nodes_in_group("guests"):
-			if _has_bubble(g):
-				saw_bubble = true
-				break
+		# 气泡整层挪到 HUD 之后不再挂在客人身上，只能问那一层现在贴着谁
+		saw_bubble = current_scene.get("bubble_label") != null
+	_account_review(gm)
 	if frame % 20 == 0:
 		periods_seen[String(gm.period().id)] = true
 		var used := int(gm.pool_income_today.get("hot", 0))
@@ -306,12 +312,39 @@ func _last_story(gm: Node) -> String:
 	var log: Array = gm.story_log
 	return String(log[log.size() - 1]) if not log.is_empty() else ""
 
-## 客人身上只挂 Sprite2D，多出一颗 Label 就是刚冒出来的气泡
-func _has_bubble(node: Node) -> bool:
-	for c in node.get_children():
-		if c is Label:
-			return true
-	return false
+## 点评条那串「声望 ±N」读的是实际到账数，还是自己按星级又算了一遍：整场只有 add_review
+## 写声望，而它每写一次声望就同时 +1 条评论，所以「评论数恰好 +1」的那个取样窗口里，
+## 声望变化就是这一条点评的到账数。窗口里两位客人一起留信（+2）时数额是两条之和，
+## 条上却只显示最后一条，这种窗口对不上号只能跳过。
+func _account_review(gm: Node) -> void:
+	var rep := float(gm.reputation)
+	var reviews := int(gm.reviews_total)
+	if not (review_delta_ok and review_cap_ok):
+		var stamp = current_scene.get("review_line")
+		var text := "" if stamp == null or not (stamp as CanvasItem).visible \
+				else String((stamp as Label).text)
+		var at := text.find("声望 ")
+		if reviews - reviews_prev == 1 and at >= 0:
+			var got := rep - rep_prev
+			var shown := text.substr(at + 3).to_float()
+			if rep_pinned < 0.0:
+				# 借位前这一格：只印得出整数，撞上零头是舍入不是错账，这种样本不作数
+				if absf(got - roundf(got)) < 0.02:
+					review_delta_ok = absf(shown - got) < 0.02
+					if not review_delta_ok:
+						print("SIM review shown=", shown, " credited=", got)
+			elif absf(shown - got) < 0.02:
+				# 星级就印在条上，顺手量一下「按星级自己算」会印什么：两者必须不同，这格才咬得住
+				review_cap_ok = absf(got - float(text.count("★") - 2) * 2.0) > 0.02
+	# 封顶那一档日常跑动够不着（收钟才八十来分），只能借位造一次：摁到差 4 点封顶，
+	# 下一条五星就只能到账一部分。本窗口刚有点评落地时不摁，免得借位和到账混进同一个窗口
+	if rep_pinned < 0.0 and review_delta_ok and not review_cap_ok \
+			and reviews == reviews_prev and frame > LAST_FRAME - 240:
+		rep_pinned = rep
+		gm.reputation = float(GameManager.MAX_REPUTATION) - 4.0
+		print("SIM borrow rep ", rep_pinned, " -> ", gm.reputation, " @frame", frame)
+	rep_prev = rep
+	reviews_prev = reviews
 
 ## 从 root 派发一次左键按下/抬起，让事件真的走完 _unhandled_input，而不是直接调方法。
 ## in_local_coords=true：headless 窗口只有 64×64，默认会按窗口坐标把落点放大到画布外。
@@ -336,6 +369,9 @@ func _on_report(report: Dictionary) -> void:
 	report_pending = true
 
 func _report(gm: Node) -> bool:
+	# 摘要那行 rep 得是这一场真实跑到的数，不能是造样本借来的位
+	if rep_pinned >= 0.0:
+		gm.reputation = rep_pinned
 	var pool_cap := 0
 	if current_scene != null and not current_scene.pools.is_empty():
 		pool_cap = int(current_scene.pools[0].cap)
@@ -387,6 +423,8 @@ func _report(gm: Node) -> bool:
 		"花费飘过扣钱字": saw_cost_float,
 		"池面冒过热气": saw_steam,
 		"点评条钉出过星级与声望": saw_review,
+		"点评条报的是实际到账声望": review_delta_ok,
+		"封顶那一档也只报到账数": review_cap_ok,
 		"点家具读到道具故事": prop_read,
 		"顶栏信箱打得开关得上": mail_panel_opened and mail_closed,
 		"读信之后风向才落地": mail_read and mail_forecast,
