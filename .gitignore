@@ -18,7 +18,8 @@ Spring/_精修备份/
 vibe_images/_*.png
 
 # 校验脚本的一次性存档目录：跑 headless 前把 APPDATA 指到这里，别碰真实进度
-godot/tools/_userdata/
+# 前缀是 _userdata 的都算——临时另开的隔离目录重跑就有，不必入库
+godot/tools/_userdata*/
 
 # 改刻匾额要拿"字还没刻上去"的原图补木纹，这份缓存与 assets 母版同源，不入库
 godot/tools/_cache/

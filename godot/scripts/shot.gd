@@ -4,8 +4,8 @@ extends SceneTree
 ##        <scene_or_room> <out_png> [wait_frames] [hour] [time_scale] [toast_text] [panel]
 ## APPDATA 必须改指：4.7 已没有 --user-dir 参数，存档默认落在玩家真实进度目录。
 ## hour/time_scale 用来验证昼夜时段与夜罩；toast_text 仅用于检查提示条排版。
-## panel 取 build:<id> / expand / report / float / gait / story:<mode>[:<物种>]，
-## 分别检查建造调色板、扩建面板、每日结算弹窗、金币飘字、步态连拍与剧情界面。
+## panel 取 build:<id> / expand / report / float / gait / review:<星级> / story:<mode>[:<物种>]，
+## 分别检查建造调色板、扩建面板、每日结算弹窗、金币飘字、步态连拍、点评条配色与剧情界面。
 ## story 的 mode：chat 对白卡、chapter 章节卡、bubble 头顶气泡、mail 信箱列表、letter 单封信正文。
 ## gait 是步态实验台：自己往房间里放几位指定物种的客人并排走，
 ## 攒成一张「行=物种、列=时刻」的胶片直接写进 out_png（不带 %d）。
@@ -20,6 +20,8 @@ var speed := 1.0
 var toast_text := ""
 var panel_mode := ""
 var build_id := ""
+## review 模式钉上去的那条点评给几星：三档配色各拍一张
+var review_stars := 5
 var start_rep := -1.0
 ## story:<kind>——chat 对白卡 / chapter 章节卡 / bubble 头顶气泡 / mail 信箱列表 / letter 单封信
 var story_kind := ""
@@ -74,6 +76,10 @@ func _initialize() -> void:
 			panel_mode = "gait"
 			if extra.length() > 5:
 				gait_ids = extra.substr(5).split("+")
+		elif extra.begins_with("review"):
+			panel_mode = "review"
+			# review:2 这样的尾巴用来换星级，三档配色各拍一张才看得出差别
+			review_stars = 5 if extra.length() < 7 else extra.substr(7).to_int()
 		elif extra == "expand" or extra == "report" or extra == "float":
 			panel_mode = extra
 	if args.size() > 7 and args[7].begins_with("rep:"):
@@ -104,8 +110,8 @@ func _boot() -> void:
 	if target.begins_with("room:"):
 		gm.current_room = target.substr(5)
 		target = "res://scenes/room.tscn"
-	if (panel_mode == "story" or panel_mode == "gait") and start_hour < 0.0:
-		# 剧情与步态截图都撞不得跨天：结算弹窗会暂停整棵树，顺带把整个画面盖掉
+	if (panel_mode == "story" or panel_mode == "gait" or panel_mode == "review") and start_hour < 0.0:
+		# 剧情、步态与点评条截图都撞不得跨天：结算弹窗会暂停整棵树，顺带把整个画面盖掉
 		start_hour = 10.0
 	if start_hour >= 0.0:
 		gm.hour = start_hour
@@ -185,6 +191,16 @@ func _open_panel() -> void:
 		gm._process(2.0)
 	elif panel_mode == "story":
 		_show_story_panel()
+	elif panel_mode == "review":
+		_show_review()
+
+## 点评条按星级分三档色，所以一张图只能验一档：要三张拼起来才看得出差别。
+## 声望增量照 add_review 的公式 (星级-2)×2 手算，截图不真写账。
+func _show_review() -> void:
+	var line := "汤很暖，下次还来。" if review_stars >= 4 else "人有点多，没泡尽兴。"
+	print("REVIEW stars=", review_stars, " tint=", current_scene.review_tint(review_stars))
+	current_scene._review_stamp("阿橘", review_stars, line, float(review_stars - 2) * 2.0,
+			"想安静", review_stars >= 4)
 
 ## 飘字要在一张帧里同时看到三拍：刚冒出、飘到一半、正在淡掉。
 ## 真实时序下同一批字只会同相位，只能把各自的 age 往回拨。

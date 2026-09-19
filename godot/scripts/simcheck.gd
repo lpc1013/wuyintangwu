@@ -42,6 +42,7 @@ var saw_bubble := false
 var saw_income_float := false
 var saw_cost_float := false
 var saw_steam := false
+var saw_review := false
 var visits_untracked := 0
 var chat_logged := false
 var chat_card_shown := false
@@ -121,7 +122,7 @@ func _process(_delta: float) -> bool:
 		max_affinity = maxi(max_affinity, g.affinity)
 		min_affinity = mini(min_affinity, g.affinity)
 		species_seen[g.species] = true
-	if not (saw_income_float and saw_cost_float and saw_steam):
+	if not (saw_income_float and saw_cost_float and saw_steam and saw_review):
 		_note_fx()
 	if frame > LAST_FRAME:
 		Engine.time_scale = 1.0
@@ -143,6 +144,12 @@ func _note_fx() -> void:
 	var steam = current_scene.get("steams")
 	if steam != null and not steam.is_empty():
 		saw_steam = true
+	# 点评条要读得出星级与声望增量才算真接上了 _on_reviewed，光 visible 不够
+	var stamp = current_scene.get("review_line")
+	if stamp != null and (stamp as CanvasItem).visible:
+		var t := String((stamp as Label).text)
+		if t.contains("★") and t.contains("声望"):
+			saw_review = true
 
 ## 在背景留白的地面块里依次摆好心愿所需设施；返回成功建设数
 func _furnish(gm: Node) -> int:
@@ -212,7 +219,9 @@ func _drive_story(gm: Node) -> void:
 		current_scene._toggle_build()
 	current_scene._select_build("")
 	_clear_lines()
-	if not chat_logged:
+	# 出词、弹卡、点空白翻页是三拍，缺任何一拍都要重试整条链：
+	# 只看 chat_logged 会在空白落点被占掉的那一次之后永远跳过这段，把「翻过页」卡死在 false
+	if not (chat_logged and chat_card_shown and chat_card_cleared):
 		_drive_chat(gm)
 	_drive_props(gm)
 	_drive_mail(gm)
@@ -349,7 +358,7 @@ func _report(gm: Node) -> bool:
 	print("SIM story chat=", chat_logged, "/", chat_card_shown, "/", chat_card_cleared,
 		" bubble=", saw_bubble, " prop=", prop_read,
 		" mail=", mail_panel_opened, "/", mail_read, "/", mail_forecast, "/", mail_closed,
-		" float=", saw_income_float, "/", saw_cost_float, " steam=", saw_steam,
+		" float=", saw_income_float, "/", saw_cost_float, " steam=", saw_steam, " review=", saw_review,
 		" untracked=", visits_untracked, " chapter=", gm.chapter + 1,
 		" read=", gm.story_log.size(), "/", Story.line_count())
 	var checks := {
@@ -377,6 +386,7 @@ func _report(gm: Node) -> bool:
 		"进账飘过金币字": saw_income_float,
 		"花费飘过扣钱字": saw_cost_float,
 		"池面冒过热气": saw_steam,
+		"点评条钉出过星级与声望": saw_review,
 		"点家具读到道具故事": prop_read,
 		"顶栏信箱打得开关得上": mail_panel_opened and mail_closed,
 		"读信之后风向才落地": mail_read and mail_forecast,

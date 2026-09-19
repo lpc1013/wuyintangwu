@@ -174,6 +174,52 @@ func _run_checks() -> int:
 				failures += 1
 			if failures == before_fail:
 				print("OK modal: indoor 对白卡给结算与信箱让位，退场后回来")
+		# 点评条：星级、那句话、心愿与声望增量都钉在顶栏下方那一条里
+		if room_id == "indoor":
+			var before_fail := failures
+			var stamp: Label = room.get("review_line")
+			if stamp == null:
+				printerr("FAIL indoor 没有点评条")
+				failures += 1
+			else:
+				if stamp.visible:
+					printerr("FAIL 没人点评点评条却亮着")
+				room.call("_review_stamp", "阿橘", 5, "汤很暖，下次还来。", 6.0, "想安静", true)
+				var t5 := String(stamp.text)
+				if not stamp.visible or not t5.contains("★★★★★") or not t5.contains("声望 +6") \
+						or not t5.contains("✓想安静"):
+					printerr("FAIL 五星点评读不全: ", t5)
+					failures += 1
+				if stamp.get_theme_color("font_color") != Color(room.get("REVIEW_GOOD_TINT")):
+					printerr("FAIL 好评没烫金: ", stamp.get_theme_color("font_color"))
+					failures += 1
+				# 淡出只给尾段：读完之前不许开始变透明
+				room.call("_update_review", float(room.get("REVIEW_SECONDS")) * 0.6)
+				if stamp.modulate.a < 0.99:
+					printerr("FAIL 点评条提前淡了: ", stamp.modulate.a)
+					failures += 1
+				room.call("_update_review", float(room.get("REVIEW_SECONDS")) * 0.15)
+				if not stamp.visible or stamp.modulate.a >= 0.99 or stamp.modulate.a <= 0.01:
+					printerr("FAIL 尾段没在淡: visible=", stamp.visible, " a=", stamp.modulate.a)
+					failures += 1
+				room.call("_review_stamp", "小满", 2, "人有点多，没泡尽兴。", -2.0, "想独处", false)
+				var t2 := String(stamp.text)
+				if not t2.contains("★★☆☆☆") or not t2.contains("声望 -2") or not t2.contains("✗想独处"):
+					printerr("FAIL 差评读不全: ", t2)
+					failures += 1
+				if stamp.get_theme_color("font_color") != Color(room.get("REVIEW_BAD_TINT")):
+					printerr("FAIL 差评没发红: ", stamp.get_theme_color("font_color"))
+					failures += 1
+				# 压过飘字，但必须让弹窗盖得住：结算面板拉开时这条得退到后面去
+				if int(stamp.z_index) <= int(room.get("FLOAT_Z")) or int(stamp.z_index) >= int(room.get("PANEL_Z")):
+					printerr("FAIL 点评条层级不对: ", stamp.z_index)
+					failures += 1
+				room.call("_update_review", float(room.get("REVIEW_SECONDS")) + 0.1)
+				if stamp.visible:
+					printerr("FAIL 点评条读完不收")
+					failures += 1
+				if failures == before_fail:
+					print("OK review: indoor 点评条钉得上、分得出色、读完会收起")
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)

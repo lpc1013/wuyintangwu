@@ -495,6 +495,7 @@ func _run() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	_check_night()
 	_check_steam()
+	_check_review()
 
 ## 夜间氛围：夜罩曲线必须连续（整点跳档很出戏），灯点必须落在画面里，
 ## 光晕贴图要中心实心、边缘全透并且只生成一次。
@@ -566,6 +567,37 @@ func _check_steam() -> void:
 	_truthy("热气团四角全透", im.get_pixel(0, 0).a == 0.0
 			and im.get_pixel(im.get_width() - 1, im.get_height() - 1).a == 0.0)
 	_truthy("热气贴图复用同一份", tex == PixelArt.steam_texture())
+
+## 点评条的账与字：现场反馈读的是 add_review 返回的**实际**增量，
+## 所以封顶、见底这两种"算式对但到账不对"的情形必须当场露出来；
+## 字数再算不宽也只按方块字估，宁可把余量算少。
+func _check_review() -> void:
+	gm.reputation = 0.0
+	_truthy("五星当场进 6 点声望", absf(float(gm.add_review(5, true, true)) - 6.0) < 0.001)
+	_truthy("两星不好不坏，增量正好 0", absf(float(gm.add_review(2, false, false))) < 0.001)
+	gm.reputation = 1.0
+	_truthy("一星只扣得动见底那 1 点", absf(float(gm.add_review(1, false, false)) + 1.0) < 0.001)
+	_truthy("声望不会扣成负数", float(gm.reputation) == 0.0)
+	gm.reputation = float(gm.MAX_REPUTATION)
+	_truthy("封顶后再好的点评也只进 0", absf(float(gm.add_review(5, true, true))) < 0.001)
+	gm.reputation = 0.0
+	# 最坏拼法：最长的点评句 + 最长的心愿名 + 五星 + 三位数声望
+	var longest := ""
+	for line: String in GameData.REVIEW_LINES:
+		if line.length() > longest.length():
+			longest = line
+	for line: String in GameData.REVIEW_LINES_LOUNGE:
+		if line.length() > longest.length():
+			longest = line
+	var widest := ""
+	for w: String in GameData.WISHES.keys():
+		var label := String(GameData.WISHES[w].label)
+		if label.length() > widest.length():
+			widest = label
+	var stamp := "阿橘 ★★★★★「%s」 ✓%s 声望 +100" % [longest, widest]
+	# 14 号字里一个汉字/星号约占 14px，空格与「」只会更窄，照方块字估是偏严的下限
+	_truthy("最坏拼法仍放得进点评条（%d 字 ≈ %dpx / 872）" % [stamp.length(), stamp.length() * 14],
+			stamp.length() * 14 <= 872)
 
 func _on_report(report: Dictionary) -> void:
 	report_seen = report
