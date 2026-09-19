@@ -224,7 +224,9 @@ func clock_text() -> String:
 func shop_stars() -> int:
 	return clampi(int(floor(reputation / 20.0)), 0, 5)
 
-func add_review(star_rating: int, good: bool, wish_done := false) -> void:
+## 记一条点评，返回**实际**到账的声望增量：封顶之后再来五星也是 0，
+## 现场反馈读的就是这个返回值，不能自己再乘一遍公式
+func add_review(star_rating: int, good: bool, wish_done := false) -> float:
 	reviews_total += 1
 	if good:
 		reviews_good += 1
@@ -236,8 +238,10 @@ func add_review(star_rating: int, good: bool, wish_done := false) -> void:
 		_ledger_add("wishes", 1)
 	_ledger_add("guests", 1)
 	_ledger_add("stars", star_rating)
+	var before := reputation
 	reputation = clampf(reputation + float(star_rating - 2) * 2.0, 0.0, MAX_REPUTATION)
 	advance_chapter()
+	return reputation - before
 
 ## 图鉴：首次接待到某物种时返回 true，便于弹提示
 func note_species(species_id: String) -> bool:

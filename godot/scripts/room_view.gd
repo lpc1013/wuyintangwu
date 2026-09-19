@@ -71,6 +71,20 @@ const STEAM_MAX := 16
 const STEAM_ALPHA := 0.3
 const STEAM_TINT := Color(0.95, 0.96, 1.0)
 
+## 点评条：客人跨出门那一下，把星级、那句话、心愿成没成、声望涨多少钉在顶栏下方。
+## 原来这些塞在底部 toast 那一格里，有两个毛病：好评与差评同色，扫一眼分不出这一单好不好；
+## 而 toast 只有一个格子，一条点评会把「谁留了信」那类要玩家记住的提示顶掉。
+## 客人最后是在画面外的门口消失的，浮标挂不到他身上，只能钉在这条谁都不挡的带上。
+const REVIEW_SECONDS := 3.4
+const REVIEW_Y := 46.0
+## 压过飘字（FLOAT_Z）但低于弹窗（PANEL_Z）：结算面板一拉开，点评条自然被盖住
+const REVIEW_Z := 920
+const REVIEW_GOOD_TINT := Color(1.0, 0.85, 0.42)
+const REVIEW_MID_TINT := Color(0.86, 0.84, 0.92)
+const REVIEW_BAD_TINT := Color(1.0, 0.52, 0.46)
+## 前段钉住给人读完，只剩这一截才开始淡
+const REVIEW_FADE_TAIL := 0.3
+
 var pools: Array[Dictionary] = []
 var guests: Array[Node2D] = []
 var spawn_acc := 0.8
@@ -127,6 +141,9 @@ var steams: Array[Dictionary] = []
 ## 会冒热气的池子下标（steam 档为 0 的不进来），与 _steam_acc 一一对应
 var steam_pools: Array[int] = []
 var _steam_acc: Array[float] = []
+## 顶栏下方那条点评：全场只有一条，新点评把旧的顶掉，不做队列
+var review_line: Label
+var _review_left := 0.0
 
 func _ready() -> void:
 	cfg = GameManager.ROOMS.get(GameManager.current_room, {})
@@ -146,6 +163,7 @@ func _ready() -> void:
 	_build_report()
 	_build_story()
 	_build_mail()
+	_build_review()
 	_build_night_tint()
 	GameManager.day_reported.connect(_on_day_reported)
 	GameManager.mail_arrived.connect(_on_mail_arrived)
@@ -265,6 +283,7 @@ func _process(delta: float) -> void:
 			%Toast.text = ""
 	if _bubble_left > 0.0:
 		_bubble_left -= delta
+	_update_review(delta)
 	_update_steam(delta)
 	_update_floats(delta)
 	_update_clock()
@@ -298,6 +317,51 @@ func _update_floats(delta: float) -> void:
 		if k >= 1.0:
 			l.queue_free()
 			floats.remove_at(i)
+
+## 点评条只有一条常驻的 Label，平时隐着；来一条点评就改写它并重新计时
+func _build_review() -> void:
+	review_line = Label.new()
+	review_line.position = Vector2(0, REVIEW_Y)
+	review_line.size = Vector2(GameManager.VIEWPORT_SIZE.x, 22)
+	review_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	review_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	## 挂在场景里但不接点击：那条带正压在客人入场路上，接了会把人挡住
+	review_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	review_line.z_index = REVIEW_Z
+	review_line.add_theme_font_size_override("font_size", 14)
+	review_line.add_theme_constant_override("outline_size", 5)
+	review_line.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.92))
+	review_line.visible = false
+	add_child(review_line)
+
+## 星级分色：四星以上烫金，三星中性，两星以下发馊的红。
+## 抽成 static 是为了让校验脚本不建房间也能问到同一张色表
+static func review_tint(stars: int) -> Color:
+	if stars >= 4:
+		return REVIEW_GOOD_TINT
+	return REVIEW_MID_TINT if stars >= 3 else REVIEW_BAD_TINT
+
+## 钉一条点评。同一时刻全场只有这一条：客人常常连着走，后一条把前一条顶掉，
+## 比叠成两行更读得清——玩家要问的只是「刚那位给了几星」。
+func _review_stamp(who: String, stars: int, line: String, rep_delta: float,
+		wish_label: String, wish_done: bool) -> void:
+	review_line.text = "%s %s%s「%s」 %s%s 声望 %+.0f" % [who,
+			"★".repeat(stars), "☆".repeat(5 - stars), line,
+			"✓" if wish_done else "✗", wish_label, rep_delta]
+	review_line.add_theme_color_override("font_color", review_tint(stars))
+	review_line.modulate.a = 1.0
+	review_line.visible = true
+	_review_left = REVIEW_SECONDS
+
+## 前段整条钉住给人读完，只剩尾段才开始淡；读完直接隐掉，挂一张透明 Label 没意义
+func _update_review(delta: float) -> void:
+	if _review_left <= 0.0:
+		return
+	_review_left -= delta
+	if _review_left <= 0.0:
+		review_line.visible = false
+		return
+	review_line.modulate.a = clampf(_review_left / (REVIEW_SECONDS * REVIEW_FADE_TAIL), 0.0, 1.0)
 
 ## 只有真冒热气的池子配计时器；初相随机错开，免得两口池同一帧一起喷一团。
 func _build_steam() -> void:
@@ -1287,11 +1351,11 @@ func _on_coin(amount: int, guest: Guest) -> void:
 	_update_hud()
 
 func _on_reviewed(guest: Guest, stars: int, wish_id: String, wish_done: bool) -> void:
-	GameManager.add_review(stars, stars >= 4, wish_done)
+	var rep: float = GameManager.add_review(stars, stars >= 4, wish_done)
 	var pool_lines: Array = GameData.REVIEW_LINES if not guest.lounge else GameData.REVIEW_LINES_LOUNGE
 	var line: String = String(pool_lines.pick_random())
 	var wish_label: String = String(GameData.WISHES[wish_id].label)
-	_toast("%s %s「%s」%s" % [guest.guest_name, "★".repeat(stars), line, "✓" + wish_label if wish_done else "✗" + wish_label])
+	_review_stamp(guest.guest_name, stars, line, rep, wish_label, wish_done)
 	GameManager.save_game()
 	_update_hud()
 
