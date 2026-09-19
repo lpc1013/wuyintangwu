@@ -32,6 +32,16 @@ for (const n of names) {
 	const code = slice(n);
 	out[n] = eval('(function(){' + code + ' return ' + n + ';})()');
 }
+// 扩员的那十只单独立在 STORY_DB_EXT 里（网页版自己负责合并，本脚本逐块求值，合不上）。
+// 抽出来时可能整块不存在——那是 S1 降级红线允许的删法，这里跟着一起降级成「没有 ext」。
+try {
+	const ext = eval('(function(){' + slice('STORY_DB_EXT') + ' return STORY_DB_EXT;})()');
+	for (const ch of Object.keys(ext)) {
+		out.STORY_DB[ch] = Object.assign(out.STORY_DB[ch] || {}, ext[ch]);
+	}
+} catch (e) {
+	console.log('no STORY_DB_EXT: ' + e.message);
+}
 fs.writeFileSync('godot/tools/_story_dump.json', JSON.stringify(out, null, 1));
 
 const db = out.STORY_DB;

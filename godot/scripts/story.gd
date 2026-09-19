@@ -5,9 +5,11 @@ class_name Story
 
 ## 网页版角色 → 本项目物种：狐狸/熊猫/老鼠/猫/小狗/兔子/猪/企鹅/青蛙/刺猬/熊/小鸡
 ## 其中 panda、mouse、pig、chick 是随叙事补进 GameData.SPECIES 的四只
+## STORY_DB_EXT 另收十只（树懒/河马/考拉/天鹅/猫头鹰/乌龟/章鱼/松鼠/狗獾/山羊），
+## 对应 slth、hipp、koal、swan、owly、turt、octo、sqrl、badg、goat
 ## 网页版 8 种水色就近归并进本作 11 种汤：冷泉→雪山冰泉，玫瑰→柚子汤，气泡泉→赛博碳酸泉，泥浴→沙漠砂浴，温汤与红汤同为温泉池
 
-## 12 只角色的档案
+## 22 只角色的档案
 const PROFILES := {
 	"foxe": {
 		"name": "狐狸",
@@ -92,10 +94,80 @@ const PROFILES := {
 		"hintRate": 0.15,
 		"confidence": 0.5,
 		"arc": null
+	},
+	"slth": {
+		"name": "树懒",
+		"nickname": "三天前知道的",
+		"hintRate": 0.12,
+		"confidence": 0.55,
+		"arc": null
+	},
+	"hipp": {
+		"name": "河马",
+		"nickname": "只泡最深的",
+		"hintRate": 0.3,
+		"confidence": 0.8,
+		"arc": null
+	},
+	"koal": {
+		"name": "考拉",
+		"nickname": "只认一种叶子",
+		"hintRate": 0.15,
+		"confidence": 0.7,
+		"arc": null
+	},
+	"swan": {
+		"name": "天鹅",
+		"nickname": "看着很贵",
+		"hintRate": 0.35,
+		"confidence": 0.65,
+		"arc": null
+	},
+	"owly": {
+		"name": "猫头鹰",
+		"nickname": "夜里看得清",
+		"hintRate": 0.45,
+		"confidence": 0.85,
+		"arc": null
+	},
+	"turt": {
+		"name": "乌龟",
+		"nickname": "记得二十年前",
+		"hintRate": 0.2,
+		"confidence": 0.9,
+		"arc": null
+	},
+	"octo": {
+		"name": "章鱼",
+		"nickname": "同时干八件事",
+		"hintRate": 0.5,
+		"confidence": 0.6,
+		"arc": null
+	},
+	"sqrl": {
+		"name": "松鼠",
+		"nickname": "囤到忘了放哪",
+		"hintRate": 0.4,
+		"confidence": 0.45,
+		"arc": null
+	},
+	"badg": {
+		"name": "狗獾",
+		"nickname": "从地下来",
+		"hintRate": 0.35,
+		"confidence": 0.8,
+		"arc": null
+	},
+	"goat": {
+		"name": "山羊",
+		"nickname": "什么都啃一口",
+		"hintRate": 0.25,
+		"confidence": 0.7,
+		"arc": null
 	}
 }
 
-## 12 条
+## 22 条
 const INTRO := {
 	"peng": [
 		{
@@ -192,10 +264,90 @@ const INTRO := {
 			"hint": {},
 			"when": {}
 		}
+	],
+	"slth": [
+		{
+			"id": "sloth-i1",
+			"segments": ["树懒趴在门框上，用三分钟挪完了最后一级台阶。", "「我说话慢。不是没想好，是早说完了，你还在等。」", "「三天前我看好的池子，今天大概还热。大概。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-i1",
+			"segments": ["河马进来时门帘被顶开又落回去，像被风吹的。", "「我挑池子只看一件事——深不深。」", "「浅的水到不了肩膀。到不了肩膀，等于没泡。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-i1",
+			"segments": ["考拉抱着一小捆叶子进门，坐下第一件事是把叶子数一遍。", "「我只吃这一种。别的给我，我也只放着。」", "「你们这儿的水也一样。认过一次，就认一辈子。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-i1",
+			"segments": ["天鹅沿着墙边走完一整圈，谁都不看。", "「水面要静，背要直，进来的顺序要最后。」", "「水面底下我在蹬。这个你别告诉别人。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-i1",
+			"segments": ["猫头鹰是撞进来的——它白天看不清路。", "「抱歉。我夜里不是这样。」", "「夜里谁在说话、谁在排队，我全看得见。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-i1",
+			"segments": ["乌龟在门槛前停住，先把头伸进来，再停一会儿。", "「二十年前这里还是一片泡汤的坡。我认得。」", "「我不催。我等的东西一般要等十年。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-i1",
+			"segments": ["章鱼进门的同时在跟三个人打招呼，用的是不同的手。", "「我一次说八件事。哪件重要，我不知道。」", "「你挑一件记住就行。挑错了也不算亏。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-i1",
+			"segments": ["松鼠冲进来，怀里抱着一堆东西，坐下就开始找地方藏。", "「这池子会火！我确定——我把它藏哪儿了来着。」", "「我记得结论。过程我拿回去补。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-i1",
+			"segments": ["地板下的检修口顶开，狗獾钻出来，抖了抖毛上的灰。", "「我不走门。门是给客人走的。」", "「管子从哪过、水从哪来，我比你清楚。」"],
+			"hint": {},
+			"when": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-i1",
+			"segments": ["山羊一进门就啃了一口门帘。", "「别紧张。我什么都啃，不代表什么都喜欢。」", "「不好吃的我吐出来。所以我说好吃的时候，你该信。」"],
+			"hint": {},
+			"when": {}
+		}
 	]
 }
 
-## 72 条
+## 132 条
 const CHAT := {
 	"foxe": [
 		{
@@ -800,10 +952,530 @@ const CHAT := {
 			},
 			"when": {}
 		}
+	],
+	"slth": [
+		{
+			"id": "sloth-c1",
+			"text": "「三天前，冷泉那边排到了门外。……现在应该还热。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.15
+			},
+			"when": {}
+		},
+		{
+			"id": "sloth-c2",
+			"text": "「热池昨天一个人都没有。我说得慢，不是我说得晚。」",
+			"hint": {
+				"pool": "hot",
+				"trend": "down",
+				"weight": 0.9
+			},
+			"when": {}
+		},
+		{
+			"id": "sloth-c3",
+			"text": "「你催我没用。我脑子不是那个速度。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "sloth-c4",
+			"text": "「上回我提醒你那句，你到今天才听懂。也算对上。」",
+			"when": {
+				"visitsMin": 3
+			},
+			"hint": {}
+		},
+		{
+			"id": "sloth-c5",
+			"text": "「树懒一周才下一次树找厕所。泡澡对我是长途旅行。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "sloth-c6",
+			"text": "「奶白那池稠。稠的东西浮力大，我省力。」",
+			"hint": {
+				"pool": "milk",
+				"trend": "up",
+				"weight": 1.2
+			},
+			"when": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-c1",
+			"text": "「水深我量过了。到肩膀的只有冷泉那边。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.5
+			},
+			"when": {}
+		},
+		{
+			"id": "hippo-c2",
+			"text": "「砂浴太浅。我半截在外面，等于没泡。」",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		},
+		{
+			"id": "hippo-c3",
+			"text": "「我一天喝八桶水，所以最懂什么叫不解渴。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "hippo-c4",
+			"text": "「药草那池今天味道冲。冲的时候人多。」",
+			"hint": {
+				"pool": "herb",
+				"trend": "up",
+				"weight": 1.4
+			},
+			"when": {}
+		},
+		{
+			"id": "hippo-c5",
+			"text": "「老板，靠里那个位子留我。不是害羞，是墙凉。」",
+			"when": {
+				"visitsMin": 4
+			},
+			"hint": {}
+		},
+		{
+			"id": "hippo-c6",
+			"text": "「别看我这身板，皮比谁都薄，晒十分钟就裂。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-c1",
+			"text": "「药草那池的气味不对路，但方向是对的。」",
+			"hint": {
+				"pool": "herb",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "koala-c2",
+			"text": "「我只去一个池子。别的池子我不评价，也不听。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "koala-c3",
+			"text": "「奶浴太滑了，我抓不住边。抓不住的东西我不喜欢。」",
+			"hint": {
+				"pool": "milk",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		},
+		{
+			"id": "koala-c4",
+			"text": "「你调过水温。我闻得出来，别问我怎么知道的。」",
+			"when": {
+				"visitsMin": 3
+			},
+			"hint": {}
+		},
+		{
+			"id": "koala-c5",
+			"text": "「考拉一天醒四个小时。今天我已经用掉两个了。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "koala-c6",
+			"text": "「那股花香的池子太闹。闹的地方不适合我这种只吃一种叶子的人。」",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "down",
+				"weight": 0.75
+			},
+			"when": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-c1",
+			"text": "「冒泡那池的水面最静。静的水才留得住人。」",
+			"hint": {
+				"pool": "cyber",
+				"trend": "up",
+				"weight": 1.35
+			},
+			"when": {}
+		},
+		{
+			"id": "swan-c2",
+			"text": "「砂浴……我在那儿待不了一分钟。别问为什么。」",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.7
+			},
+			"when": {}
+		},
+		{
+			"id": "swan-c3",
+			"text": "「我进池子的顺序永远是最后一个。这是规矩，不是怕。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "swan-c4",
+			"text": "「花香那池最近有人专门来拍。拍的人多了，就要排。」",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "up",
+				"weight": 1.4
+			},
+			"when": {}
+		},
+		{
+			"id": "swan-c5",
+			"text": "「你今天多摆了一把椅子。我看见了，不说谢谢。」",
+			"when": {
+				"visitsMin": 5
+			},
+			"hint": {}
+		},
+		{
+			"id": "swan-c6",
+			"text": "「天鹅的羽毛防水，所以入水前那一秒我最紧张。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-c1",
+			"text": "「夜里谁往哪边去，我数得清清楚楚。」",
+			"hint": {
+				"pool": "hot",
+				"trend": "up",
+				"weight": 1.45
+			},
+			"when": {}
+		},
+		{
+			"id": "owl-c2",
+			"text": "「白天别说这些。白天我只看见亮。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "owl-c3",
+			"text": "「冷泉那池半夜最满。满的时候，白天会空。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "owl-c4",
+			"text": "「你打烊太早了。最好的客人都是夜里来的。」",
+			"when": {
+				"visitsMin": 3
+			},
+			"hint": {}
+		},
+		{
+			"id": "owl-c5",
+			"text": "「我转头能转二百七十度。你背后那几个位子我也看着。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "owl-c6",
+			"text": "「今晚起风。起风的时候，热池那边会提前满。」",
+			"when": {
+				"period": "nite"
+			},
+			"hint": {
+				"pool": "hot",
+				"trend": "up",
+				"weight": 1.5
+			}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-c1",
+			"text": "「二十年前这坡上只有一个池。现在你们分这么细。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "turtle-c2",
+			"text": "「冷泉那池底下有块石头是活的，会晃。晃的池子留客。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.35
+			},
+			"when": {}
+		},
+		{
+			"id": "turtle-c3",
+			"text": "「我不去冒泡那池。太吵。吵的东西散得也快。」",
+			"hint": {
+				"pool": "cyber",
+				"trend": "down",
+				"weight": 0.75
+			},
+			"when": {}
+		},
+		{
+			"id": "turtle-c4",
+			"text": "「慢一点没有坏处。我等的东西一般十年到。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "turtle-c5",
+			"text": "「药草那池的味道，跟我小时候那口井像。像的东西会回来。」",
+			"hint": {
+				"pool": "herb",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "turtle-c6",
+			"text": "「老板，你把台账翻到最早那页。最早那页有答案。」",
+			"when": {
+				"visitsMin": 6
+			},
+			"hint": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-c1",
+			"text": "「三件事：冷泉要满、奶白要淡、砂浴在排队——你挑一件办。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.4
+			},
+			"when": {}
+		},
+		{
+			"id": "octopus-c2",
+			"text": "「我一只手记一个池子，八只手记不完你这家店。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "octopus-c3",
+			"text": "「花香那池我量过了。四个人同一分钟来的。」",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "up",
+				"weight": 1.5
+			},
+			"when": {}
+		},
+		{
+			"id": "octopus-c4",
+			"text": "「药草那边我劝你别囤。我四只手都这么说。」",
+			"hint": {
+				"pool": "herb",
+				"trend": "down",
+				"weight": 0.72
+			},
+			"when": {}
+		},
+		{
+			"id": "octopus-c5",
+			"text": "「我昨天把浴衣穿反了。不是失误，是另一只手先穿的。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "octopus-c6",
+			"text": "「章鱼没有骨头。所以我泡哪儿都像泡对了，你别学我。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-c1",
+			"text": "「我确定！冷泉那边要火！我把它藏哪儿了来着——结论我记住了。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.25
+			},
+			"when": {}
+		},
+		{
+			"id": "squirrel-c2",
+			"text": "「花香那池我囤了三条毛巾。三条。为什么三条我忘了。」",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "up",
+				"weight": 1.15
+			},
+			"when": {}
+		},
+		{
+			"id": "squirrel-c3",
+			"text": "「冒泡那池……我本来想说什么来着。」",
+			"hint": {
+				"pool": "cyber",
+				"trend": "down",
+				"weight": 0.9
+			},
+			"when": {}
+		},
+		{
+			"id": "squirrel-c4",
+			"text": "「老板，你柜子里第二层是不是我的松果。不是的话我拿错了，抱歉。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "squirrel-c5",
+			"text": "「我记结论不记过程。过程你想知道，明天再来问。」",
+			"when": {
+				"visitsMin": 3
+			},
+			"hint": {}
+		},
+		{
+			"id": "squirrel-c6",
+			"text": "「松鼠的记性靠味道。你换了香薰，我的账就乱了一半。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-c1",
+			"text": "「管子从冷泉那边过。管子结霜，今晚那池就满。」",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.5
+			},
+			"when": {}
+		},
+		{
+			"id": "badger-c2",
+			"text": "「砂浴底下是空的。空的东西填不满，你省点砂。」",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		},
+		{
+			"id": "badger-c3",
+			"text": "「我不走门。走门的是客人，我走该走的路。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "badger-c4",
+			"text": "「奶白那池的下水堵了半指。我没说，你自己查。」",
+			"when": {
+				"visitsMin": 4
+			},
+			"hint": {}
+		},
+		{
+			"id": "badger-c5",
+			"text": "「獾的洞有七个口。你这家店只有两个，我替你着急。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "badger-c6",
+			"text": "「药草那池的根是我从北坡刨的。刨得多的东西，价钱要跌。」",
+			"hint": {
+				"pool": "herb",
+				"trend": "down",
+				"weight": 0.75
+			},
+			"when": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-c1",
+			"text": "「我啃过你门口那块牌子。牌子写的是实话：热池今天人多。」",
+			"hint": {
+				"pool": "hot",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "goat-c2",
+			"text": "「砂浴我尝过，不好吃。不好吃的东西客人也不爱吃。」",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.78
+			},
+			"when": {}
+		},
+		{
+			"id": "goat-c3",
+			"text": "「别挡着我，我在闻这个池子。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "goat-c4",
+			"text": "「你上回问我校招。我啃了一口你的账本，纸是甜的，记的就是好事。」",
+			"when": {
+				"visitsMin": 3
+			},
+			"hint": {}
+		},
+		{
+			"id": "goat-c5",
+			"text": "「山羊的胃有四个室。所以我说难喝，是四票都算过的。」",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "goat-c6",
+			"text": "「花香那池我啃过花瓣。啃过就知道，那股味最近会淡。」",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		}
 	]
 }
 
-## 30 条
+## 60 条
 const LETTER := {
 	"foxe": [
 		{
@@ -1106,10 +1778,324 @@ const LETTER := {
 			"hint": {},
 			"when": {}
 		}
+	],
+	"slth": [
+		{
+			"id": "sloth-l1",
+			"title": "三天前写好的信",
+			"body": "老板：\n这封信我写了三天。\n写的时候冷泉那边刚排起队。\n你现在收到，还来得及赶上一个尾巴。\n——树懒",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.1
+			},
+			"when": {}
+		},
+		{
+			"id": "sloth-l2",
+			"title": "树懒的补记",
+			"body": "老板：\n上一封我漏了一句。\n漏的那句是：热池那边我写错了。\n错的地方，你反着看。\n——树懒",
+			"hint": {
+				"pool": "hot",
+				"trend": "down",
+				"weight": 0.85
+			},
+			"when": {}
+		},
+		{
+			"id": "sloth-l3",
+			"title": "一封还没写完的信",
+			"body": "老板：\n这封我还在路上。\n（信到这里就断了，后面半页是三天后补的）\n我其实只想说一句：谢谢你没催我。",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-l1",
+			"title": "河马的一页纸",
+			"body": "老板：\n我回来又量了一次水深。\n冷泉那边还是到肩膀。到肩膀我就还来。\n——河马",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.35
+			},
+			"when": {}
+		},
+		{
+			"id": "hippo-l2",
+			"title": "河马的说明",
+			"body": "老板：\n砂浴不是不好，是给我用的话太薄。\n薄的意思你自己判断。\n——河马",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		},
+		{
+			"id": "hippo-l3",
+			"title": "河马的第二页",
+			"body": "老板：\n我走的时候把门口的石板踩松了一块。\n明天会有人绊倒。那个人可能是往花香那池去的。\n——河马",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "up",
+				"weight": 1.15
+			},
+			"when": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-l1",
+			"title": "考拉的信（只有一行）",
+			"body": "老板：\n药草那池我明天还来。\n——考拉",
+			"hint": {
+				"pool": "herb",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "koala-l2",
+			"title": "考拉的道歉",
+			"body": "老板：\n我昨天把别人的浴衣抱走了。\n不是拿错，是它闻起来像我那棵树。\n我已经洗干净挂回去了，挂在最高的钩子上。",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "koala-l3",
+			"title": "考拉的第三封",
+			"body": "老板：\n奶白那池我劝你别扩。\n扩了也是空的，空的是时候不对。\n——考拉",
+			"hint": {
+				"pool": "milk",
+				"trend": "down",
+				"weight": 0.78
+			},
+			"when": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-l1",
+			"title": "一张压得很平的信",
+			"body": "老板：\n今天有人在水边站了很久没下水。\n那种人不会去浅池，会去最满的那个。\n——天鹅",
+			"hint": {
+				"pool": "cyber",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "swan-l2",
+			"title": "天鹅的第二封",
+			"body": "老板：\n我在水面上看着很安静。\n水底下那双脚今天替你数了人数。\n数得不多，你先别扩。",
+			"hint": {
+				"pool": "cyber",
+				"trend": "down",
+				"weight": 0.85
+			},
+			"when": {}
+		},
+		{
+			"id": "swan-l3",
+			"title": "天鹅的第三封",
+			"body": "老板：\n砂浴那件事我写得很难为情。\n我确实滚进去了。滚进去以后我没有立刻出来。\n这件事请不要告诉任何客人。",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-l1",
+			"title": "夜里写的信",
+			"body": "老板：\n今晚打烊前，热池那边还会再来一批。\n他们是从山上下来的，走的是近路。\n——猫头鹰",
+			"hint": {
+				"pool": "hot",
+				"trend": "up",
+				"weight": 1.45
+			},
+			"when": {}
+		},
+		{
+			"id": "owl-l2",
+			"title": "猫头鹰的更正",
+			"body": "老板：\n上一封我写的是「还会再来」。\n我回去想了想，那句应该是「已经来过了」。\n我白天写字不准。",
+			"hint": {
+				"pool": "hot",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		},
+		{
+			"id": "owl-l3",
+			"title": "猫头鹰的第三封",
+			"body": "老板：\n你店里那盏最亮的灯，照得见门口，照不见角落。\n角落那几个人才是真来泡的。\n——猫头鹰",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-l1",
+			"title": "一封写了二十年的信",
+			"body": "老板：\n我上次来是二十年前。那时候只有一个池。\n现在你分成很多个，我记不住。\n我只记得一件事：会晃的那池留客。\n——乌龟",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "turtle-l2",
+			"title": "乌龟的第二封",
+			"body": "老板：\n冒泡那池太吵，我劝你把它挪远一点。\n挪远了，安静那几池反倒有人排队。\n——乌龟",
+			"hint": {
+				"pool": "cyber",
+				"trend": "down",
+				"weight": 0.78
+			},
+			"when": {}
+		},
+		{
+			"id": "turtle-l3",
+			"title": "乌龟的第三封",
+			"body": "老板：\n我记错了。二十年前是两个池。\n记错不要紧，要紧的是我明天还来。",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-l1",
+			"title": "四只手写的信（另外四只在写别的）",
+			"body": "老板：\n一、冷泉要满。二、花香要淡。\n三、砂浴在排队。四、我忘了第四条。\n第四条我下次补。\n——章鱼",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.4
+			},
+			"when": {}
+		},
+		{
+			"id": "octopus-l2",
+			"title": "章鱼的补信",
+			"body": "老板：\n第四条想起来了：你上回给我留的那条毛巾，我拿错了。\n拿成了四条。四条里有一条是别人的。\n这条我送回来。",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "octopus-l3",
+			"title": "章鱼的第三封",
+			"body": "老板：\n奶白那池我一只手试过，两只手试过。\n试到最后八只手都不想去。\n不去的意思，你自己掂量。",
+			"hint": {
+				"pool": "milk",
+				"trend": "down",
+				"weight": 0.75
+			},
+			"when": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-l1",
+			"title": "夹着松果的信",
+			"body": "老板：\n我本来要写三件事，现在只剩一件：\n花香那池会火。另外两件我藏起来了。\n藏在哪我不说，说了就不好找了。\n——松鼠",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "up",
+				"weight": 1.35
+			},
+			"when": {}
+		},
+		{
+			"id": "squirrel-l2",
+			"title": "松鼠的道歉",
+			"body": "老板：\n柜子里第二层那个松果不是你的。\n是我的。我昨天翻你的账本就是在找它。\n对不起。账本我看了，数字我不记得。",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "squirrel-l3",
+			"title": "松鼠的第二封",
+			"body": "老板：\n冷泉那边我囤了位置。\n囤位置这件事我做得不熟练，可能囤到别人那儿去了。\n总之你先备着。",
+			"hint": {
+				"pool": "ice",
+				"trend": "up",
+				"weight": 1.2
+			},
+			"when": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-l1",
+			"title": "从检修口塞进来的信",
+			"body": "老板：\n管子我通了一遍。通了以后药草那池的味道会淡。\n淡了人就不去。你要不要重新堵上，你决定。\n——狗獾",
+			"hint": {
+				"pool": "herb",
+				"trend": "down",
+				"weight": 0.72
+			},
+			"when": {}
+		},
+		{
+			"id": "badger-l2",
+			"title": "狗獾的第二封",
+			"body": "老板：\n你后墙根下有一条旧水道，二十年前走水。\n挖开还能用。能用多久我不知道，我不挖别人家的墙。\n——狗獾",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "badger-l3",
+			"title": "狗獾的第三封",
+			"body": "老板：\n砂浴那池我睡过底下。底下比上面凉。\n凉的地方留不住人，人往热的地方去。\n——狗獾",
+			"hint": {
+				"pool": "sand",
+				"trend": "down",
+				"weight": 0.8
+			},
+			"when": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-l1",
+			"title": "有牙印的信",
+			"body": "老板：\n这封信我啃过一角。啃过的部分是好话。\n热池那边明天该多备水，我鼻子不骗人。\n——山羊",
+			"hint": {
+				"pool": "hot",
+				"trend": "up",
+				"weight": 1.3
+			},
+			"when": {}
+		},
+		{
+			"id": "goat-l2",
+			"title": "山羊的第二封",
+			"body": "老板：\n你门口那块「客满」的木牌我啃了。\n不是抗议。是它写的是假话，假话不好吃。\n——山羊",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "goat-l3",
+			"title": "山羊的第三封",
+			"body": "老板：\n花香那池的花瓣不好吃，涩。\n涩的东西客人嚼两天就腻了，趁早换。\n——山羊",
+			"hint": {
+				"pool": "yuzu",
+				"trend": "down",
+				"weight": 0.78
+			},
+			"when": {}
+		}
 	]
 }
 
-## 24 条
+## 44 条
 const GRUMBLE := {
 	"foxe": [
 		{
@@ -1302,10 +2288,170 @@ const GRUMBLE := {
 			"hint": {},
 			"when": {}
 		}
+	],
+	"slth": [
+		{
+			"id": "sloth-gru-1",
+			"text": "「这个水……我还没泡到，就要走了。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "sloth-gru-2",
+			"text": "「排队可以。队伍别动得太快。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-gru-1",
+			"text": "「这水到不了我的肩膀。差很多。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "hippo-gru-2",
+			"text": "「我占地方。我知道。我可以站远一点。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-gru-1",
+			"text": "「这不是我认的那个池子。我不认第二次。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "koala-gru-2",
+			"text": "「我先睡一会儿。睡醒你再决定要不要赶我。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-gru-1",
+			"text": "「我的背绷不住了。这样很难看。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "swan-gru-2",
+			"text": "「我在等。我等的样子很好看，你别催。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-gru-1",
+			"text": "「白天这水……我看不清它深不深。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "owl-gru-2",
+			"text": "「灯太亮了。我闭上眼也是亮的。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-gru-1",
+			"text": "「这池子我游不动。不是冷，是没到那份上。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "turtle-gru-2",
+			"text": "「慢一点。你们什么都快。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-gru-1",
+			"text": "「我八只手，一只都没够到边。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "octopus-gru-2",
+			"text": "「我在数。数到第几只我忘了。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-gru-1",
+			"text": "「这里没有我能藏的东西。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "squirrel-gru-2",
+			"text": "「我先把要说的忘了。忘了就等会儿再说。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-gru-1",
+			"text": "「这水底下不通。不通的池子我不喜欢。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "badger-gru-2",
+			"text": "「我不催。我在洞里等过更久的。」",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-gru-1",
+			"text": "「这个不好吃。我是说，不好泡。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		},
+		{
+			"id": "goat-gru-2",
+			"text": "「我啃一口确认过了。这个不行。」",
+			"hint": {},
+			"when": {}
+		}
 	]
 }
 
-## 36 条
+## 66 条
 const FAREWELL := {
 	"foxe": [
 		{
@@ -1615,6 +2761,266 @@ const FAREWELL := {
 		{
 			"id": "chick-far-w",
 			"text": "「不痒的水……我记住了。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"slth": [
+		{
+			"id": "sloth-far-p",
+			"text": "「我明天还来。明天我说的是今天的事。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "sloth-far-b",
+			"text": "「还行。还行要泡很久才品得出。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "sloth-far-w",
+			"text": "「这水太急。我赶不上。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-far-p",
+			"text": "「到肩膀了。今天到肩膀了。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "hippo-far-b",
+			"text": "「够泡。够泡我就不挑了。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "hippo-far-w",
+			"text": "「我出来还是干的。这不算泡。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-far-p",
+			"text": "「我认了这个池子。第二次认。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "koala-far-b",
+			"text": "「嗯。我睡过了。睡过就算来过。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "koala-far-w",
+			"text": "「这里没有我要的那种味道。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-far-p",
+			"text": "「你什么都没看见。这就是最好的招待。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "swan-far-b",
+			"text": "「水面还算平。我勉强站住了。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "swan-far-w",
+			"text": "「我的脚在水底下忙了一整晚。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-far-p",
+			"text": "「下次我白天来。白天我也认得这里。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "owl-far-b",
+			"text": "「还行。还行不是夸，是实话。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "owl-far-w",
+			"text": "「太亮了，也太早了。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-far-p",
+			"text": "「这水能记二十年。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "turtle-far-b",
+			"text": "「跟二十年前差不多。差不多就是好。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "turtle-far-w",
+			"text": "「这池子留不住我，我也留不住它。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-far-p",
+			"text": "「八只手都举赞成。很少有这么齐的时候。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "octopus-far-b",
+			"text": "「五票通过，三票弃权。算好吧。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "octopus-far-w",
+			"text": "「有一只手到现在还生气。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-far-p",
+			"text": "「我把今天藏起来了。藏在哪不重要，反正藏好了。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "squirrel-far-b",
+			"text": "「还行。还行我明天就忘了。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "squirrel-far-w",
+			"text": "「我忘了今天是怎么过的。应该过得不好。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-far-p",
+			"text": "「你这店的地底下是通的。通的地方我不说第二遍。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "badger-far-b",
+			"text": "「能泡。能泡我就从洞里上来。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "badger-far-w",
+			"text": "「这水走的是死路。死路我不待。」",
+			"when": {
+				"match": "wrong"
+			},
+			"hint": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-far-p",
+			"text": "「我一口都没啃。这就是最高评价。」",
+			"when": {
+				"match": "perfect"
+			},
+			"hint": {}
+		},
+		{
+			"id": "goat-far-b",
+			"text": "「不好不坏。像青草。」",
+			"when": {
+				"match": "basic"
+			},
+			"hint": {}
+		},
+		{
+			"id": "goat-far-w",
+			"text": "「这个我啃过了，不啃第二次。」",
 			"when": {
 				"match": "wrong"
 			},
@@ -1953,7 +3359,7 @@ const PROP_STORY := {
 	]
 }
 
-## 36 条
+## 66 条
 const MURMUR := {
 	"foxe": [
 		{
@@ -2239,6 +3645,246 @@ const MURMUR := {
 		{
 			"id": "chick-mur-r",
 			"segments": ["「毛湿了会变得很小。」", "「别让人看见。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"slth": [
+		{
+			"id": "sloth-mur-1",
+			"segments": ["「水把我浮起来了。」", "「那我就不用动了。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "sloth-mur-2",
+			"segments": ["「三分钟后我要挪一下。」", "「……两分钟后再说。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "sloth-mur-r",
+			"segments": ["「我说得慢。」", "「所以我说完的那句，通常是真的。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"hipp": [
+		{
+			"id": "hippo-mur-1",
+			"segments": ["「到肩膀了。」", "「那就谁也不用理了。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "hippo-mur-2",
+			"segments": ["「水里没人能推我。」", "「这个我喜欢。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "hippo-mur-r",
+			"segments": ["「我在最底下坐着。」", "「上面那些声音跟我没关系。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"koal": [
+		{
+			"id": "koala-mur-1",
+			"segments": ["「这个味道不对。」", "「但是能睡。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "koala-mur-2",
+			"segments": ["「抱着这块石头。」", "「跟抱着树差不多。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "koala-mur-r",
+			"segments": ["「我只认一种东西。」", "「认得久了，就省了很多事。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"swan": [
+		{
+			"id": "swan-mur-1",
+			"segments": ["「水面别起波纹。」", "「别起、别起、别起——」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "swan-mur-2",
+			"segments": ["「背要直。」", "「在水里也直。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "swan-mur-r",
+			"segments": ["「水底下那双脚。」", "「今天可以停一下。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"owly": [
+		{
+			"id": "owl-mur-1",
+			"segments": ["「这个时辰水最静。」", "「静得能听见别人。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "owl-mur-2",
+			"segments": ["「我一只眼睁着。」", "「另一只也睁着。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "owl-mur-r",
+			"segments": ["「白天谁都不看我。」", "「晚上所有人都被我看着。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"turt": [
+		{
+			"id": "turtle-mur-1",
+			"segments": ["「这水跟二十年前一样。」", "「也可能不一样。我不计较。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "turtle-mur-2",
+			"segments": ["「壳在水里会轻一点。」", "「轻一点就够。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "turtle-mur-r",
+			"segments": ["「我记性太好。」", "「泡着的时候才肯忘一会儿。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"octo": [
+		{
+			"id": "octopus-mur-1",
+			"segments": ["「一只手在数水温。」", "「另外七只在泡。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "octopus-mur-2",
+			"segments": ["「我可以同时想八件事。」", "「现在只想一件。麻烦。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "octopus-mur-r",
+			"segments": ["「今天没人跟我说话。」", "「八只手都闲下来了。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"sqrl": [
+		{
+			"id": "squirrel-mur-1",
+			"segments": ["「这里藏一个。」", "「……刚才藏哪了。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "squirrel-mur-2",
+			"segments": ["「水里有松果的影子。」", "「不是。不是也先捞。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "squirrel-mur-r",
+			"segments": ["「今天什么都没囤。」", "「手空着，人还在。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"badg": [
+		{
+			"id": "badger-mur-1",
+			"segments": ["「管子在我背后响。」", "「响着才安心。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "badger-mur-2",
+			"segments": ["「水底下是石头。」", "「石头我认得。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "badger-mur-r",
+			"segments": ["「我不爱说话。」", "「泡着的时候话更少。正好。」"],
+			"rarity": "rare",
+			"bubbleStyle": "glow",
+			"hint": {},
+			"when": {}
+		}
+	],
+	"goat": [
+		{
+			"id": "goat-mur-1",
+			"segments": ["「先闻，再下。」", "「闻着没问题。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "goat-mur-2",
+			"segments": ["「这池子没东西可啃。」", "「也挺好。」"],
+			"rarity": "common",
+			"hint": {},
+			"when": {}
+		},
+		{
+			"id": "goat-mur-r",
+			"segments": ["「我今天一口都没咬。」", "「忍住了。忍住了算我的。」"],
 			"rarity": "rare",
 			"bubbleStyle": "glow",
 			"hint": {},

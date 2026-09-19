@@ -107,9 +107,51 @@ const SPECIES := {
 		"beak": "#ff9a3a", "comb": true,
 		"likes": ["cyber", "yuzu"], "dislike": "ice", "pay": 8, "perso": "到处认门",
 		"names": ["叽叽", "豆芽", "绒毛", "噗噗", "桃子"]},
+	## 以下十只是 +50% 扩员补进来的：每只都带一整套台词，辨识点靠耳尾型与配色的错开
+	## —— 三十只挤在同一张名册里，撞了剪影就等于少了一只客人。
+	"slth": {"name": "树懒", "ear": "round", "tail": "stub", "size": 1.12,
+		"body": "#a89078", "belly": "#e8dcc8", "dark": "#5f4d3c",
+		"likes": ["moss", "tatami"], "dislike": "cyber", "pay": 15, "perso": "半天挪一步",
+		"names": ["挂挂", "三秒", "森森", "迟迟", "木木"]},
+	"hipp": {"name": "河马", "ear": "round", "tail": "stub", "size": 1.34,
+		"body": "#9a8fa8", "belly": "#f0c8c8", "dark": "#5a4f66", "snout": "#d9a6ac",
+		"likes": ["hot", "stone"], "dislike": "sand", "pay": 17, "perso": "占半池像占全池",
+		"names": ["泡芙", "河河", "大嘴", "水花", "闷闷"]},
+	"koal": {"name": "考拉", "ear": "round", "tail": "stub", "size": 1.02,
+		"body": "#a8a8ae", "belly": "#e8e6e0", "dark": "#5c5c64", "ear_dark": true,
+		"likes": ["herb", "moss"], "dislike": "cyber", "pay": 14, "perso": "一天睡二十小时",
+		"names": ["桉桉", "抱抱", "茸茸", "盹盹", "叶叶"]},
+	"swan": {"name": "天鹅", "ear": "none", "tail": "flat", "size": 1.16,
+		"body": "#f6f4f2", "belly": "#ffffff", "dark": "#b8b0aa", "beak": "#e8843a",
+		"likes": ["moon", "milk"], "dislike": "sand", "pay": 16, "perso": "优雅是装的",
+		"names": ["白羽", "弯弯", "镜湖", "傲傲", "霜霜"]},
+	"owly": {"name": "猫头鹰", "ear": "point", "tail": "none", "size": 1.0,
+		"body": "#b08c5e", "belly": "#f0e2c8", "dark": "#5e4426", "mask": true,
+		"likes": ["moon", "cyber"], "dislike": "hot", "pay": 15, "perso": "白天睡不醒",
+		"names": ["夜夜", "咕咕", "睁睁", "瞳瞳", "更更"]},
+	"turt": {"name": "乌龟", "ear": "none", "tail": "stub", "size": 1.0,
+		"body": "#6f9a5e", "belly": "#d8e8b0", "dark": "#3d5c34",
+		"likes": ["stone", "hot"], "dislike": "ice", "pay": 12, "perso": "背着自己的家",
+		"names": ["壳壳", "千年", "吞吞", "稳稳", "寿寿"]},
+	"octo": {"name": "章鱼", "ear": "none", "tail": "none", "size": 1.06,
+		"body": "#e08a9a", "belly": "#f8d8dc", "dark": "#8e4c5c",
+		"likes": ["cyber", "ice"], "dislike": "sand", "pay": 16, "perso": "八只手同时泡",
+		"names": ["八八", "触触", "卷卷", "泡泡", "染染"]},
+	"sqrl": {"name": "松鼠", "ear": "point", "tail": "fluffy", "size": 0.88,
+		"body": "#c8804a", "belly": "#f4e0c4", "dark": "#7a4a20",
+		"likes": ["yuzu", "tatami"], "dislike": "ice", "pay": 10, "perso": "囤到忘了放哪",
+		"names": ["囤囤", "果果", "蓬蓬", "窜窜", "栗栗"]},
+	"badg": {"name": "狗獾", "ear": "round", "tail": "stub", "size": 1.06,
+		"body": "#8f8f96", "belly": "#e6e2da", "dark": "#33333a", "mask": true,
+		"likes": ["herb", "sand"], "dislike": "milk", "pay": 13, "perso": "地下道通全山",
+		"names": ["掘掘", "条纹", "洞洞", "阿獾", "夜巡"]},
+	"goat": {"name": "山羊", "ear": "point", "tail": "stub", "size": 1.1,
+		"body": "#e6e2d8", "belly": "#f8f6f0", "dark": "#7a7466", "horn": true,
+		"likes": ["moss", "herb"], "dislike": "milk", "pay": 14, "perso": "什么都啃一口",
+		"names": ["崖崖", "胡子", "啃啃", "角角", "青青"]},
 }
 
-## 步态分档：二十个物种共用一套节拍的话，熊和鸭子就走成了一个样。
+## 步态分档：三十个物种共用一套节拍的话，熊和鸭子就走成了一个样。
 ## step=步幅倍率（乘 Guest.STEP_PX，决定多久换一次抬脚），speed=移速倍率，
 ## dip=落脚那一下身子沉几像素，dip_t=沉按住多久（换帧进度），sway=左右摆几像素，
 ## air=腾空那半拍整只抬几像素，rise=脚掌离地几像素（画进抬腿帧），swing=前爪摆幅，
@@ -138,10 +180,12 @@ const GAITS := {
 ## 物种 → 档位；没列出的走默认档 "walk"
 const GAIT_OF := {
 	"capy": "trudge", "bear": "trudge", "coww": "trudge", "panda": "trudge", "pig": "trudge",
+	"slth": "trudge", "hipp": "trudge", "turt": "trudge",
 	"duck": "waddle", "peng": "waddle", "chick": "waddle", "ottr": "waddle", "seal": "waddle",
-	"cat3": "tiptoe", "foxe": "tiptoe", "deer": "tiptoe",
+	"swan": "waddle", "octo": "waddle",
+	"cat3": "tiptoe", "foxe": "tiptoe", "deer": "tiptoe", "owly": "tiptoe", "goat": "tiptoe",
 	"rabb": "hop", "frog": "hop",
-	"mouse": "scurry", "hedg": "scurry",
+	"mouse": "scurry", "hedg": "scurry", "sqrl": "scurry",
 }
 
 ## 汤种：cap 为池位容量，coin_gen 决定是否直接产币，daily_cap 为该汤种单日产币上限，solo 表示只接待一位

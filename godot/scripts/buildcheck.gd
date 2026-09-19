@@ -336,14 +336,14 @@ func _run() -> void:
 				for w: String in (e.get("when", {}) as Dictionary):
 					if not KNOWN_WHEN.has(w):
 						unknown_when += 1
-	_truthy("台词共 %d 条，与网页版 STORY_DB 对齐" % total_lines, total_lines == 252)
+	_truthy("台词共 %d 条，与网页版 STORY_DB 对齐" % total_lines, total_lines == 432)
 	_truthy("每条 id 全局唯一（坏 %d 条）" % dup_ids, dup_ids == 0)
 	_truthy("角色频道只点本作有的物种（坏 %d 个）" % unknown_actors, unknown_actors == 0)
 	_truthy("hint.pool 全是本作汤种（坏 %d 条）" % unknown_pools, unknown_pools == 0)
 	_truthy("没有 null 的 hint，否则 apply_hint 形参当场炸", null_hints == 0)
 	_truthy("when 只用运行时认得的键（坏 %d 种）" % unknown_when, unknown_when == 0)
 	_truthy("道具台词都挂得到本作的某件设施（坏 %d 个）" % orphan_props, orphan_props == 0)
-	_truthy("12 只角色各有档案", Story.PROFILES.size() == 12)
+	_truthy("22 只角色各有档案", Story.PROFILES.size() == 22)
 	_truthy("档案昵称非空", String(Story.profile("foxe").nickname) != "")
 	var mono_guests := 0
 	var mono_star := 0
