@@ -77,8 +77,6 @@ const STEAM_TINT := Color(0.95, 0.96, 1.0)
 ## 客人最后是在画面外的门口消失的，浮标挂不到他身上，只能钉在这条谁都不挡的带上。
 const REVIEW_SECONDS := 3.4
 const REVIEW_Y := 46.0
-## 压过飘字（FLOAT_Z）但低于弹窗（PANEL_Z）：结算面板一拉开，点评条自然被盖住
-const REVIEW_Z := 920
 const REVIEW_GOOD_TINT := Color(1.0, 0.85, 0.42)
 const REVIEW_MID_TINT := Color(0.86, 0.84, 0.92)
 const REVIEW_BAD_TINT := Color(1.0, 0.52, 0.46)
@@ -318,21 +316,24 @@ func _update_floats(delta: float) -> void:
 			l.queue_free()
 			floats.remove_at(i)
 
-## 点评条只有一条常驻的 Label，平时隐着；来一条点评就改写它并重新计时
+## 点评条只有一条常驻的 Label，平时隐着；来一条点评就改写它并重新计时。
+## 必须挂在 HUD 那一层（layer 10）而不是房间画布：夜罩是 layer 5 的整片蓝，
+## 挂在房间里 z_index 给到多高都没用，入夜后金字会被染到和墙面同亮度。
+## 它顶的本来就是 toast，而 toast 一直就在 HUD 上。
 func _build_review() -> void:
 	review_line = Label.new()
 	review_line.position = Vector2(0, REVIEW_Y)
 	review_line.size = Vector2(GameManager.VIEWPORT_SIZE.x, 22)
 	review_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	review_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	## 挂在场景里但不接点击：那条带正压在客人入场路上，接了会把人挡住
+	## 挂上去但不接点击：那条带正压在客人入场路上，接了会把人挡住
 	review_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	review_line.z_index = REVIEW_Z
 	review_line.add_theme_font_size_override("font_size", 14)
 	review_line.add_theme_constant_override("outline_size", 5)
 	review_line.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.92))
 	review_line.visible = false
-	add_child(review_line)
+	var hud: CanvasLayer = get_node("HUD")
+	hud.add_child(review_line)
 
 ## 星级分色：四星以上烫金，三星中性，两星以下发馊的红。
 ## 抽成 static 是为了让校验脚本不建房间也能问到同一张色表
@@ -350,8 +351,15 @@ func _review_stamp(who: String, stars: int, line: String, rep_delta: float,
 			"✓" if wish_done else "✗", wish_label, rep_delta]
 	review_line.add_theme_color_override("font_color", review_tint(stars))
 	review_line.modulate.a = 1.0
-	review_line.visible = true
 	_review_left = REVIEW_SECONDS
+	_sync_review()
+
+## 面板开着时点评条必须让位：它挂在 HUD 上，盖得住结算也盖得住信箱。
+## 抽出来是因为面板开、面板关两处都要同步一次，而结算期间整棵树暂停，
+## _process 根本不会跑，只靠 _update_review 每帧刷是刷不到的。
+func _sync_review() -> void:
+	if _review_left > 0.0:
+		review_line.visible = not _modal_up()
 
 ## 前段整条钉住给人读完，只剩尾段才开始淡；读完直接隐掉，挂一张透明 Label 没意义
 func _update_review(delta: float) -> void:
@@ -361,6 +369,7 @@ func _update_review(delta: float) -> void:
 	if _review_left <= 0.0:
 		review_line.visible = false
 		return
+	_sync_review()
 	review_line.modulate.a = clampf(_review_left / (REVIEW_SECONDS * REVIEW_FADE_TAIL), 0.0, 1.0)
 
 ## 只有真冒热气的池子配计时器；初相随机错开，免得两口池同一帧一起喷一团。
@@ -1060,6 +1069,7 @@ func _toggle_mail() -> void:
 	_sync_mail_view()
 	# 信箱盖着的那段时间里攒下的台词，等它退场才轮到露面
 	_sync_story_card()
+	_sync_review()
 	_sync_bottom_stack()
 
 func _refresh_mail() -> void:
@@ -1210,6 +1220,7 @@ func _on_day_reported(report: Dictionary) -> void:
 	get_tree().paused = true
 	report_panel.visible = true
 	_sync_story_card()
+	_sync_review()
 	_sync_bottom_stack()
 
 func _close_report() -> void:
@@ -1219,6 +1230,7 @@ func _close_report() -> void:
 	_update_hud()
 	# 结算期间攒下的台词（跨天正好推进章节）现在才准放出来
 	_sync_story_card()
+	_sync_review()
 	_sync_bottom_stack()
 
 func _try_spawn() -> void:

@@ -210,16 +210,37 @@ func _run_checks() -> int:
 				if stamp.get_theme_color("font_color") != Color(room.get("REVIEW_BAD_TINT")):
 					printerr("FAIL 差评没发红: ", stamp.get_theme_color("font_color"))
 					failures += 1
-				# 压过飘字，但必须让弹窗盖得住：结算面板拉开时这条得退到后面去
-				if int(stamp.z_index) <= int(room.get("FLOAT_Z")) or int(stamp.z_index) >= int(room.get("PANEL_Z")):
-					printerr("FAIL 点评条层级不对: ", stamp.z_index)
+				# 必须挂在 HUD 那一层：夜罩是 layer 5 的整片蓝，同一个画布里 z_index 给多高都压不过它
+				var hud: CanvasLayer = stamp.get_parent()
+				var veil: CanvasLayer = room.get("night_layer")
+				if hud == null or veil == null or int(hud.layer) <= int(veil.layer):
+					printerr("FAIL 点评条压不进夜罩之上: hud=", hud, " veil=", veil)
+					failures += 1
+				# 挪到 HUD 上就盖得住结算与信箱，只能自己让位——照对白卡那套开合序列走一遍
+				room.call("_review_stamp", "阿橘", 5, "汤很暖，下次还来。", 6.0, "想安静", true)
+				room.call("_on_day_reported", {"day": 3, "guests": 1, "income": 10, "wishes": 1,
+						"good": 1, "bad": 0, "stars_avg": 4.0, "rep_delta": 1.0, "by_type": {}})
+				if stamp.visible:
+					printerr("FAIL 结算面板开着，点评条还压在账目上")
+					failures += 1
+				room.call("_close_report")
+				if not stamp.visible:
+					printerr("FAIL 结算关掉后点评条没回来")
+					failures += 1
+				room.call("_toggle_mail")
+				if stamp.visible:
+					printerr("FAIL 信箱开着，点评条还压着信")
+					failures += 1
+				room.call("_toggle_mail")
+				if not stamp.visible:
+					printerr("FAIL 信箱关掉后点评条没回来")
 					failures += 1
 				room.call("_update_review", float(room.get("REVIEW_SECONDS")) + 0.1)
 				if stamp.visible:
 					printerr("FAIL 点评条读完不收")
 					failures += 1
 				if failures == before_fail:
-					print("OK review: indoor 点评条钉得上、分得出色、读完会收起")
+					print("OK review: indoor 点评条钉得上、分得出色、压在夜罩之上、面板开着会让位")
 		room.queue_free()
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)
