@@ -15,14 +15,16 @@ import collections
 SRC = "godot/tools/_story_dump.json"
 OUT = "godot/scripts/story.gd"
 
-# 网页版 12 只 → 本项目物种 id；新增的 4 只（熊猫/老鼠/猪/小鸡）在 data.gd 里补齐
-# +50% 扩员的十只走 STORY_DB_EXT，英文名 → data.gd 里的新 id，一并登记在这张表里
+# 网页版英文名 → 本项目物种 id。原 12 只 + 扩员的 10 只 + 最后补上台词的 8 只，
+# 全名册三十只都登记在这张表里；漏一只，channel_table 就在裸下标上 KeyError。
 ACTOR_TO_SPECIES = {
 	"fox": "foxe", "panda": "panda", "mouse": "mouse", "cat": "cat3",
 	"dog": "shib", "rabbit": "rabb", "pig": "pig", "penguin": "peng",
 	"frog": "frog", "hedgehog": "hedg", "bear": "bear", "chick": "chick",
 	"sloth": "slth", "hippo": "hipp", "koala": "koal", "swan": "swan", "owl": "owly",
 	"turtle": "turt", "octopus": "octo", "squirrel": "sqrl", "badger": "badg", "goat": "goat",
+	"capybara": "capy", "raccoon": "racc", "duck": "duck", "otter": "ottr", "deer": "deer",
+	"redpanda": "rpnd", "seal": "seal", "cow": "coww",
 }
 # 网页版 8 种水色 → 本作 11 种汤：按体感就近归并。
 # 温汤/红汤都是普通热池，合成温泉池；冷泉归雪山冰泉；气泡泉正是碳酸泉；泥浴与砂浴同为「埋进介质干泡」。
@@ -125,8 +127,8 @@ def main():
 		"",
 		"## 网页版角色 → 本项目物种：狐狸/熊猫/老鼠/猫/小狗/兔子/猪/企鹅/青蛙/刺猬/熊/小鸡",
 		"## 其中 panda、mouse、pig、chick 是随叙事补进 GameData.SPECIES 的四只",
-		"## STORY_DB_EXT 另收十只（树懒/河马/考拉/天鹅/猫头鹰/乌龟/章鱼/松鼠/狗獾/山羊），",
-		"## 对应 slth、hipp、koal、swan、owly、turt、octo、sqrl、badg、goat",
+		"## STORY_DB_EXT 再收其余十八只（十只扩员新面孔 + 八只原本沉默的老角色），至此名册三十只全有台词；",
+		"## 英文名到物种 id 的对照只有一处真相，就是 gen_story.py 的 ACTOR_TO_SPECIES，这里不再抄一遍",
 		"## 网页版 8 种水色就近归并进本作 11 种汤：冷泉→雪山冰泉，玫瑰→柚子汤，气泡泉→赛博碳酸泉，泥浴→沙漠砂浴，温汤与红汤同为温泉池",
 		"",
 	]
