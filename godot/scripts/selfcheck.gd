@@ -312,6 +312,28 @@ func _run_checks() -> int:
 			if failures == lift_fail:
 				print("OK lift: indoor 飘字与气泡抬到夜罩之上，气泡跟着客人走")
 		room.queue_free()
+	# 贴图迁移：一个物种一旦吃了贴图，六张必须同画布——混进一张程序化图，
+	# 迈步时就是两档像素密度来回跳，玩家看到的不是换腿而是整只抖动。
+	# 走 load 而不是直接写 Guest：guest.gd 正文引用自动加载，静态引它会崩掉入口脚本
+	var guest_script := load("res://scripts/guest.gd") as GDScript
+	var tex_fail := failures
+	var tex_migrated := 0
+	for id in GameData.SPECIES.keys():
+		if not bool(guest_script.call("uses_ai_tex", String(id))):
+			continue
+		tex_migrated += 1
+		var base: Texture2D = guest_script.call("_tex", String(id), Color.WHITE, "walk")
+		for pose in ["stepL", "stepR", "hop", "soak", "rest"]:
+			var t: Texture2D = guest_script.call("_tex", String(id), Color.WHITE, pose)
+			if t.get_size() != base.get_size():
+				printerr("FAIL ", id, " 的 ", pose, " 画布 ", t.get_size(),
+						" 与 walk ", base.get_size(), " 不同")
+				failures += 1
+	if tex_migrated == 0:
+		printerr("FAIL 没有任何物种吃到贴图，assets/animals 空了")
+		failures += 1
+	elif failures == tex_fail:
+		print("OK tex: ", tex_migrated, " 个物种吃贴图，六张姿态同画布")
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)
 	else:

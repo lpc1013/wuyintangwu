@@ -18,6 +18,14 @@ const FOOT_PAD := 2.0
 ## 基准步幅：一脚步子迈过的地面距离，实际步幅再乘物种步态档位。
 ## 步频由它与实际速度共同决定，动画跟着位移走就不会滑步
 const STEP_PX := 20.0
+## AI 贴图目录：落位脚本把即梦原图处理成 <物种>_<姿态>.png 放这里。
+## 只认 walk 那一张作为「这个物种已经迁完」的信号——迁一半的物种宁可全套用
+## 自己的 walk 顶帧，也不能在迈步时把 72 网格的图和 32 网格的程序化图来回切，
+## 玩家看到的不是换腿而是整只抖动
+const AI_DIR := "res://assets/animals"
+## 贴图按最终屏幕像素出图，画布多大就是多大；程序化那套才需要 2 倍放大
+const AI_SCALE := 1.0
+const PROC_SCALE := 2.0
 ## 基准换帧序列：只换抬哪条腿，具体走哪几帧由步态档位给（跳步物种另有 hop 帧）
 const STRIDE := ["stepL", "stepR"]
 
@@ -31,6 +39,8 @@ signal murmured(guest: Node2D)
 signal leaving(guest: Node2D)
 
 static var _tex_cache := {}
+## 请求过但磁盘上没有的 <物种>_<姿态>：自检拿它核对迁移是否漏帧
+static var _ai_missing := {}
 
 var state := State.WALK_IN
 var species := "shib"
@@ -59,6 +69,9 @@ var _stepping_out := true
 var _murmured := false
 var _step_out_pos := Vector2.ZERO
 var _walk_off := 0.0
+## 精灵放大倍率：程序化 2 倍、贴图 1 倍。沉浮与摆幅写在精灵局部坐标里，
+## 不乘回这个倍率，换成贴图后同样的档位数值在屏幕上只晃一半
+var tex_scale := PROC_SCALE
 
 var sprite: Sprite2D
 var ripple: Sprite2D
@@ -81,7 +94,8 @@ func setup(p_species: String, p_yukata: Color, spawn: Vector2, p_slot: Dictionar
 	target = slot.pos + Vector2(0, -4)
 	sprite = Sprite2D.new()
 	sprite.texture = _tex(species, yukata, "walk")
-	sprite.scale = Vector2(2, 2)
+	tex_scale = tex_scale_for(species)
+	sprite.scale = Vector2(tex_scale, tex_scale)
 	# 底部中心锚定：脚掌落在节点位置上方 FOOT_PAD 像素，体型不同也不会浮空或陷地
 	_walk_off = FOOT_PAD - sprite.texture.get_height() * 0.5
 	sprite.offset = Vector2(0, _walk_off)
@@ -90,10 +104,46 @@ func setup(p_species: String, p_yukata: Color, spawn: Vector2, p_slot: Dictionar
 	add_to_group("guests")
 
 static func _tex(sp: String, yk: Color, pose: String) -> Texture2D:
+	var ai := _ai_tex(sp, pose)
+	if ai != null:
+		return ai
+	# 这个物种已经吃贴图了，缺的帧就拿自己的中立帧顶上：
+	# 抬腿帧退回程序化画法会让两档像素密度在迈步时来回跳，比不换腿难看得多
+	var stand := _ai_tex(sp, "walk")
+	if stand != null:
+		return stand
 	var key := "%s|%s|%s" % [sp, yk.to_html(), pose]
 	if not _tex_cache.has(key):
 		_tex_cache[key] = ImageTexture.create_from_image(PixelArt.make_animal(sp, yk, pose))
 	return _tex_cache[key]
+
+## 直接读文件而不是 load()：贴图不必经编辑器导入就能用，
+## --script 跑自检时才不会因为 .godot/imported 缺席而全员退回程序化画法
+static func _ai_tex(sp: String, pose: String) -> Texture2D:
+	var key := "ai|%s|%s" % [sp, pose]
+	if _tex_cache.has(key):
+		return _tex_cache[key]
+	var path := "%s/%s_%s.png" % [AI_DIR, sp, pose]
+	var tex: Texture2D = null
+	if FileAccess.file_exists(path):
+		var img := Image.load_from_file(path)
+		if img != null:
+			tex = ImageTexture.create_from_image(img)
+	if tex == null:
+		# 没迁的物种整组都缺，记下来只会把名单冲成一片噪音；只报「已经吃了贴图却漏帧」的
+		if pose != "walk" and _ai_tex(sp, "walk") != null:
+			_ai_missing["%s_%s" % [sp, pose]] = true
+	_tex_cache[key] = tex
+	return tex
+
+## 这个物种有没有迁到贴图：只看 walk 那一张，与 _tex 的判据保持一致
+static func uses_ai_tex(sp: String) -> bool:
+	return _ai_tex(sp, "walk") != null
+
+## 该物种精灵的屏幕倍率：贴图本身就是最终尺寸，只有程序化那套 32 网格才放大 2 倍。
+## 走路与对照表共用这一个判据，免得验收时看着对、进游戏却是两个人
+static func tex_scale_for(sp: String) -> float:
+	return AI_SCALE if uses_ai_tex(sp) else PROC_SCALE
 
 func state_name() -> String:
 	return State.keys()[state]
@@ -137,15 +187,15 @@ func _walk(delta: float, to: Vector2, on_arrive: Callable) -> void:
 ## 跳步物种反过来：腾空帧两脚在画里已经收起来，这时整只离地才是对的。
 func _bob(pose: String, phase: float) -> float:
 	if pose == "hop":
-		return -float(gait.get("air", 0.0)) if phase > 0.2 else 0.0
+		return -float(gait.get("air", 0.0)) * tex_scale if phase > 0.2 else 0.0
 	if phase < float(gait.get("dip_t", 0.28)):
-		return float(gait.get("dip", 0.0))
+		return float(gait.get("dip", 0.0)) * tex_scale
 	return 0.0
 
 ## 摇摆：身子随两脚交替左右倒，只有蹼禽与海豹那一档给非零值
 func _sway(n: int) -> float:
 	var s := float(gait.get("sway", 0.0))
-	return s if n % 2 == 0 else -s
+	return s * tex_scale if n % 2 == 0 else -s * tex_scale
 
 ## 走完一段：回到两脚着地的中立帧，落座与泡水都从这个姿势接
 func _finish_walk() -> void:
