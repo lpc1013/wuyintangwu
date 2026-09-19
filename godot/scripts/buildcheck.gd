@@ -339,6 +339,16 @@ func _run() -> void:
 	_truthy("台词共 %d 条，与网页版 STORY_DB 对齐" % total_lines, total_lines == 576)
 	_truthy("每条 id 全局唯一（坏 %d 条）" % dup_ids, dup_ids == 0)
 	_truthy("角色频道只点本作有的物种（坏 %d 个）" % unknown_actors, unknown_actors == 0)
+	# 反方向：漏一个频道不会报错，只会让那只客人从此站着不开口。
+	# 扩员时最容易漏的就是这个——新物种进了名册，台词只填了一半频道。
+	var mute := 0
+	for ch: String in ACTOR_CHANNELS:
+		var table := Story.channel(ch)
+		for id: String in GameData.SPECIES:
+			if not table.has(id):
+				mute += 1
+	_truthy("名册 %d 只在 %d 个角色频道都有台词（缺 %d 处）" % [
+			GameData.SPECIES.size(), ACTOR_CHANNELS.size(), mute], mute == 0)
 	_truthy("hint.pool 全是本作汤种（坏 %d 条）" % unknown_pools, unknown_pools == 0)
 	_truthy("没有 null 的 hint，否则 apply_hint 形参当场炸", null_hints == 0)
 	_truthy("when 只用运行时认得的键（坏 %d 种）" % unknown_when, unknown_when == 0)
