@@ -36,6 +36,27 @@ func _run_checks() -> int:
 		print("OK ", path, " nodes=", _count(inst))
 		inst.queue_free()
 	var gm_node: Node = root.get_node("GameManager")
+	# 案内图：锁着的房间键不许是死键——手机端没有 tooltip，点下去必须报出解锁条件
+	gm_node.reputation = 0.0
+	var map: Node = (load("res://scenes/map.tscn") as PackedScene).instantiate()
+	root.add_child(map)
+	var locked := 0
+	var dead := 0
+	for b: Node in map.get_node("RoomButtons").get_children():
+		var btn := b as Button
+		if btn.text.begins_with("锁定"):
+			locked += 1
+		if btn.disabled:
+			dead += 1
+	map.call("_on_room_pressed", "chashitsu")
+	var hint: Label = map.get("_hint")
+	if dead > 0 or locked == 0 or hint == null or not hint.text.contains("声望"):
+		printerr("FAIL 案内图锁着的房间点了没反应: 锁=", locked, " 死键=", dead,
+				" 提示=", hint.text if hint != null else "<无>")
+		failures += 1
+	else:
+		print("OK map: ", locked, " 颗锁着的房间键都可点，点出「", hint.text, "」")
+	map.queue_free()
 	for room_id: String in gm_node.ROOMS:
 		gm_node.current_room = room_id
 		var room: Node = (load("res://scenes/room.tscn") as PackedScene).instantiate()

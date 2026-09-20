@@ -819,7 +819,8 @@ func _refresh_expand() -> void:
 		else:
 			var cost := GameManager.upgrade_cost(room_id, pi)
 			expand_rows[pi].button.text = "升级 %d" % cost
-			expand_rows[pi].button.disabled = not GameManager.can_upgrade(room_id, pi)
+			# 钱不够时不许 disabled：那一下点下去要告诉他差多少金币，而不是变成一颗死键
+			expand_rows[pi].button.disabled = false
 			expand_rows[pi].button.tooltip_text = "多 1 个位，收益与单日额度同步提升"
 
 ## 升级后按新等级重算容量，空出来的位立刻可以接待
@@ -842,7 +843,8 @@ func _on_upgrade(pi: int) -> void:
 		_toast("扩建完成：%s 升到 Lv%d" % [String(GameData.pool(String(pools[pi].type)).get("name", "汤池")),
 				GameManager.pool_level(room_id, pi)])
 	else:
-		_toast("金币不够，或者已是最高等级")
+		var cost := GameManager.upgrade_cost(room_id, pi)
+		_toast("这一级要 %d 金币，还差 %d" % [cost, cost - GameManager.coins])
 	_refresh_expand()
 	_update_hud()
 

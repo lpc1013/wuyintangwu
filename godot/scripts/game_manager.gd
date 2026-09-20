@@ -831,7 +831,9 @@ func is_unlocked(room_id: String) -> bool:
 	return reputation >= float(unlock_rep(room_id))
 
 func lock_text(room_id: String) -> String:
-	return "声望 %d 解锁（当前 %d）" % [unlock_rep(room_id), int(floor(reputation))]
+	var need := unlock_rep(room_id)
+	var now := int(floor(reputation))
+	return "声望 %d 解锁（当前 %d，还差 %d）" % [need, now, need - now]
 
 func unlocked_count() -> int:
 	var n := 0
