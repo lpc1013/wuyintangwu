@@ -38,6 +38,9 @@ if not exist "web\index.html" (
         exit /b 1
     )
     echo [1/2] Exporting Web build to .\web ...
+    rem Godot will not create the export folder itself - it fails with
+    rem "target folder does not exist or is not accessible" instead.
+    if not exist web mkdir web
     "%GODOT%" --headless --path godot --export-release Web "../web/index.html"
     if not exist "web\index.html" (
         echo [ERROR] Export failed - see the messages above.
