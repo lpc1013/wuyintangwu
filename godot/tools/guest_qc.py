@@ -4,8 +4,8 @@
 以及 poseΔ（同物种内走路周期里两张最像的姿态之间的像素差占比）。
 
 poseΔ 只算走路周期那六张：sit 和它们本来就长得不一样，混进去只会抬高基线，反倒
-掩盖走路六张里真正掺水的那对。sit 单立一摊盯两件事——下盘要比上盘宽（坐垫摊开，
-站着没这特征），配色要和 walk 还认得出是同一只（换批次最容易串色）。
+掩盖走路六张里真正掺水的那对。sit 只盯一条——剪影不能比 walk 还高，产线把内容塞进
+固定画布，原图画高了客人一坐下就当场长大一号；像不像坐下、颜色串没串，看拼条那一列。
 
 poseΔ 用像素差而非剪影重合度：走路周期六张的轮廓本来就挨得近，剪影重合度全员
 96% 以上，区分不出「腿换了个位置」和「干脆复制了一份」。差的那部分集中在
@@ -31,11 +31,12 @@ DUP_DIFF = 0.005
 
 ## 茶室专用的第七张，只和 walk 比，不进 poseΔ 的两两矩阵。
 SIT = "sit"
-## 坐垫摊开的下盘必须比肩宽：水豚实测 1.29，站姿只有 1.03。低于这条线就是没真坐下。
-SIT_WIDER = 1.15
-## 与 walk 的配色直方图交叠（32 级量化）。水豚实测 0.42，派生帧能到 0.99；
-## 掉到 0.25 以下基本就是那批图把浴衣颜色生串了。
-SIT_PALETTE = 0.25
+## sit 的剪影高 / walk 的剪影高，上限。产线把内容塞进固定画布，原图画得比站姿高，
+## 客人一坐下就当场长大一号——这是唯一能从数字上坐实的毛病。
+## 下盘宽比与配色交叠两条曾经也在这儿把关，25 张全肉眼看过一遍：没有一张是没坐下的，
+## 两条指标量的其实都只是「蹲下来之后面积重新分布了多少」——大耳朵把宽比压下去，
+## 坐垫和正脸把配色交叠压下去，误伤率百分之百，于是只留这一条。
+SIT_GROW = 1.10
 
 
 def stats(path):
@@ -50,38 +51,11 @@ def rgba_of(im):
     return list(im.getdata())
 
 
-def stance_ratio(path):
-    """下盘最宽处 / 上盘最宽处。盘腿坐在垫子上时坐垫把底边摊开，这个比值明显大于 1；
-    站着的那几张只有脚掌，比值贴着 1。"""
-    im = Image.open(path).convert("RGBA")
-    w = im.size[0]
-    a = im.getchannel("A")
-    bbox = a.getbbox() or (0, 0, 0, 0)
-    top, end = bbox[1], bbox[3]          # getbbox 的下边是开区间，别越界
-    if end - top <= 0:
-        return 0.0
-    rows = []
-    for y in range(top, end):
-        xs = [x for x in range(w) if a.getpixel((x, y)) > 16]
-        rows.append(xs[-1] - xs[0] + 1 if xs else 0)
-    third = max(1, len(rows) // 3)
-    up = max(rows[:third]) or 1
-    return max(rows[-third:]) / float(up)
-
-
-def palette_overlap(pa, pb):
-    """两张图的配色直方图交叠，32 级量化后逐色取小者相加。"""
-    def hist(px):
-        c = {}
-        for r, g, b, a in px:
-            if a <= 16:
-                continue
-            k = (r // 32 * 32, g // 32 * 32, b // 32 * 32)
-            c[k] = c.get(k, 0) + 1
-        tot = float(sum(c.values())) or 1.0
-        return dict((k, v / tot) for k, v in c.items())
-    ha, hb = hist(pa), hist(pb)
-    return sum(min(ha.get(k, 0.0), hb.get(k, 0.0)) for k in set(ha) | set(hb))
+def silhouette_height(path):
+    """不透明像素的包围盒高度（getbbox 的下边是开区间，别越界）。"""
+    a = Image.open(path).convert("RGBA").getchannel("A")
+    bb = a.getbbox() or (0, 0, 0, 0)
+    return bb[3] - bb[1]
 
 
 def closest_pair(items):
@@ -143,10 +117,8 @@ def main():
         sit_path = os.path.join(ANIM, "%s_%s.png" % (sid, SIT))
         if os.path.exists(sit_path):
             paste_cell(sheet, sit_path, r, len(POSES))
-            walk = dict(masks).get("walk")
-            sit = (stance_ratio(sit_path),
-                   palette_overlap(walk, rgba_of(Image.open(sit_path).convert("RGBA")))
-                   if walk else 1.0)
+            wk = silhouette_height(os.path.join(ANIM, "%s_walk.png" % sid))
+            sit = silhouette_height(sit_path) / float(wk or 1)
         top = min(b[1] for b in boxes)
         foot = max(b[3] for b in boxes)
         left = min(b[0] for b in boxes)
@@ -158,8 +130,8 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     sheet.save(OUT)
     print("sheet ->", os.path.normpath(OUT), sheet.size)
-    print("%-6s %-5s %-6s %-22s %-6s %-18s %-12s %s" % (
-        "id", "poses", "foot±", "union bbox", "fill%", "poseΔ", "sit 宽比/配色", "missing"))
+    print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %s" % (
+        "id", "poses", "foot±", "union bbox", "fill%", "poseΔ", "sit高比", "missing"))
     dups, bad_sit = [], []
     for sid, n, missing, ub, fs, fmin, fmax, pose_delta, dv, sit in rows:
         flag = []
@@ -171,11 +143,10 @@ def main():
             flag.append("缺 sit")
             sit_col = "-"
         else:
-            ratio, pal = sit
-            sit_col = "%.2f / %.0f%%" % (ratio, pal * 100)
-            if ratio < SIT_WIDER or pal < SIT_PALETTE:
-                bad_sit.append((sid, ratio, pal))
-        print("%-6s %-5s %-6s %-22s %-6s %-18s %-12s %s" % (
+            sit_col = "%.2f" % sit
+            if sit > SIT_GROW:
+                bad_sit.append((sid, sit))
+        print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %s" % (
             sid, "%d/6" % n, "%dpx" % fs, str(ub), "%.1f-%.1f" % (fmin * 100, fmax * 100),
             pose_delta, sit_col, " ".join(flag)))
         if dv < DUP_DIFF:
@@ -185,10 +156,9 @@ def main():
         for sid, delta in dups:
             print("  %-6s %s" % (sid, delta))
     if bad_sit:
-        print("\nsit 不像坐下的（下盘没摊开）或配色串了（和 walk 对不上）：")
-        for sid, ratio, pal in bad_sit:
-            print("  %-6s 宽比 %.2f（线 %.2f）配色 %.0f%%（线 %.0f%%）" % (
-                sid, ratio, SIT_WIDER, pal * 100, SIT_PALETTE * 100))
+        print("\n坐下长大一号（sit 剪影比 walk 还高，换一张 alt 重落）：")
+        for sid, grow in bad_sit:
+            print("  %-6s 高比 %.2f（线 %.2f）" % (sid, grow, SIT_GROW))
 
 
 main()

@@ -285,15 +285,33 @@ def derive_rest(walk: Image.Image, outdir: str, species: str) -> str:
     return os.path.basename(dst)
 
 
+def landing_factor(src: str, block: int, cw: int, ch: int) -> int:
+    """这张原图按产线规则会被缩到几倍：1 输出像素 = factor 原始像素。"""
+    box = snap_bbox(key_out(Image.open(src)), block)
+    k = max(1, math.ceil(max((box[2] - box[0]) / block / cw,
+                             (box[3] - box[1]) / block / ch)))
+    return block * k
+
+
 def run_one(src: str, species: str, pose: str, cw: int, ch: int, colors: int,
-            outdir: str, keep_debug: str = "") -> None:
+            outdir: str, keep_debug: str = "", anchor: str = "") -> None:
     keyed = key_out(Image.open(src))
     block = measure_block(Image.open(src).convert("RGB"))
     box = snap_bbox(keyed, block)
     crop = keyed.crop(box)
     # 缩放倍率必须同时是方块边长的整数倍，且缩完要塞得进画布
-    k = max(1, math.ceil(max(crop.width / block / cw, crop.height / block / ch)))
-    factor = block * k
+    factor = landing_factor(src, block, cw, ch)
+    # 站姿之外的那几张必须沿用自己 walk 的比例：产线是「塞满画布」，而坐姿的包围盒
+    # 天生比站姿扁——同一只兔子 walk 用 24、sit 只要 20，客人一坐下就长大两成。
+    # 取两者里更大的那个倍率，最多只是坐那张小一点，绝不会变大。
+    grow_from = ""
+    if pose != "walk" and anchor and os.path.exists(anchor):
+        ablock = measure_block(Image.open(anchor).convert("RGB"))
+        if ablock == block:
+            af = landing_factor(anchor, block, cw, ch)
+            if af > factor:
+                grow_from = f" 锚定 walk={af}"
+                factor = af
     mid = shrink(crop, factor)
     final, offx, offy = place(quantize(mid, colors), cw, ch)
 
@@ -308,6 +326,7 @@ def run_one(src: str, species: str, pose: str, cw: int, ch: int, colors: int,
         extra += [v for v in (soak, rest) if v]
     print(f"OK {dst} block={block}px factor={factor} srcBox={box} "
           f"mid={mid.width}x{mid.height} canvas={cw}x{ch} pad=({offx},{offy})"
+          + grow_from
           + (f" derived={extra}" if extra else ""))
 
     if keep_debug:
@@ -320,11 +339,22 @@ def run_one(src: str, species: str, pose: str, cw: int, ch: int, colors: int,
 RAWS = (".webp", ".png", ".jpg", ".jpeg")
 
 
-def batch(indir: str, outdir: str, cw: int, ch: int, colors: int, pose: str = "walk") -> int:
+def find_walk(base: str, raw_dir: str) -> str:
+    """这只自己的 walk 原图落在哪儿：walk 批次就平铺在 raw_dir 下。找不到返回空串。"""
+    for ext in RAWS:
+        p = os.path.join(raw_dir, base + ext)
+        if os.path.exists(p):
+            return p
+    return ""
+
+
+def batch(indir: str, outdir: str, cw: int, ch: int, colors: int, pose: str = "walk",
+          raw_dir: str = "vibe_images/ai_raw") -> int:
     """扫目录里的 <物种>.<ext>：walk 一只一张就够，另外五帧全由它推出来。
 
     其它姿态（sit）只落这一张，绝不去推派生帧——派生是给步态用的，
-    坐下的图再撑一次脚只会把盘好的腿弄散。
+    坐下的图再撑一次脚只会把盘好的腿弄散；同时拿 raw_dir 里那只自己的 walk 原图
+    当比例锚，坐下才不会长大一号。
 
     物种名对不对不在这儿把关——引擎只按 <物种>_walk.png 找文件，
     多出来的名字就是几张没人读的图，不会把游戏带坏。
@@ -334,7 +364,8 @@ def batch(indir: str, outdir: str, cw: int, ch: int, colors: int, pose: str = "w
         base, ext = os.path.splitext(name)
         if ext.lower() not in RAWS:
             continue
-        run_one(os.path.join(indir, name), base, pose, cw, ch, colors, outdir)
+        run_one(os.path.join(indir, name), base, pose, cw, ch, colors, outdir,
+                anchor=find_walk(base, raw_dir))
         done.append(base)
     print(f"BATCH {len(done)} 只 {pose} 落位：{done}")
     if not done:
@@ -481,7 +512,8 @@ def main() -> int:
                     help="--prompts 与 --batch 处理哪个姿态，默认 walk")
     ap.add_argument("--prompts", action="store_true", help="列出还没落位的物种的即梦提示词")
     ap.add_argument("--prompts-json", default="", help="把待办提示词写成 UTF-8 JSON，给浏览器自动化读")
-    ap.add_argument("--raw-dir", default="vibe_images/ai_raw", help="原图待办目录，只影响提示文案")
+    ap.add_argument("--raw-dir", default="vibe_images/ai_raw",
+                    help="walk 原图目录：提示文案去哪儿找它，非 walk 姿态就拿它当比例锚")
     ap.add_argument("--data", default="godot/scripts/data.gd", help="物种名单来源，配合 --prompts 用")
     ap.add_argument("--keep-debug", default="", help="顺手把中间产物写到这个目录，便于肉眼核对")
     args = ap.parse_args()
@@ -491,11 +523,12 @@ def main() -> int:
         return emit_prompts(args.outdir, args.data, args.prompts_json, args.raw_dir,
                             args.art_pose)
     if args.batch:
-        return batch(args.batch, args.outdir, cw, ch, args.colors, args.art_pose)
+        return batch(args.batch, args.outdir, cw, ch, args.colors, args.art_pose,
+                     args.raw_dir)
     if not args.src or not args.species:
         raise SystemExit("要么给 <原图> <物种id> [姿态]，要么用 --batch <目录>")
     run_one(args.src, args.species, args.pose, cw, ch, args.colors,
-            args.outdir, args.keep_debug)
+            args.outdir, args.keep_debug, find_walk(args.species, args.raw_dir))
     return 0
 
 
