@@ -779,8 +779,10 @@ static func make_heart() -> Image:
 				px(im, x, y, Color(0.98, 0.45, 0.6, 1.0))
 	return im
 
+## 茶室客人头顶升起的一缕热气：三团自下而上叠小，偏冷的白才压得住榻榻米的暖木色
 static func make_steam_puff() -> Image:
 	var im := make_image(8, 8)
-	fill_ellipse(im, 3.5, 5.0, 3.0, 2.5, Color(1, 1, 1, 0.5))
-	fill_ellipse(im, 4.5, 2.5, 2.0, 2.0, Color(1, 1, 1, 0.35))
+	fill_ellipse(im, 3.5, 6.0, 3.0, 1.8, Color(0.95, 0.97, 1.0, 0.85))
+	fill_ellipse(im, 4.6, 3.4, 2.2, 1.6, Color(0.95, 0.97, 1.0, 0.62))
+	fill_ellipse(im, 3.2, 1.4, 1.5, 1.2, Color(0.95, 0.97, 1.0, 0.42))
 	return im
