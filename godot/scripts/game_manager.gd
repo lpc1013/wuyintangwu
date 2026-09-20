@@ -220,10 +220,10 @@ func night_light() -> float:
 	var t := clampf((h - from) / maxf(to - from, 1.0), 0.0, 1.0)
 	return lerpf(float(p.light), float(q.light), t)
 
+## 一天 210 秒，一小时才 8.75 秒，带分钟的话每秒跳六七下，玩家看到的是抖动的数字
+## 而不是时间。展示只留小时；hour 仍是浮点，时段与夜罩渐变都靠它。
 func clock_text() -> String:
-	var h := int(floor(hour))
-	var m := int(fmod(hour, 1.0) * 60.0)
-	return "%02d:%02d" % [h, m]
+	return "%02d:00" % int(floor(hour))
 
 func shop_stars() -> int:
 	return clampi(int(floor(reputation / 20.0)), 0, 5)
