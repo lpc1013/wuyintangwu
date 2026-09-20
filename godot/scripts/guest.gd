@@ -15,6 +15,8 @@ const REST_MAX := 21.0
 const COIN_INTERVAL := 2.0
 const COIN_INTERVAL_REST := 3.0
 const FOOT_PAD := 2.0
+## 真盘腿那张贴图自带坐垫，坐垫中心在画布底边上方约 12 格；往下压这么多才和背景那只垫子同心
+const SIT_CUSH_SINK := 10.0
 ## 基准步幅：一脚步子迈过的地面距离，实际步幅再乘物种步态档位。
 ## 步频由它与实际速度共同决定，动画跟着位移走就不会滑步
 const STEP_PX := 20.0
@@ -232,10 +234,21 @@ func _set_soak_pose() -> void:
 	ripple.z_index = -1
 	add_child(ripple)
 
-## 落座图与行走图同尺寸：脚掌换成坐垫后仍贴着同一条地面线，锚点照用行走那套
+## 落座图与行走图同画布同底边锚点，切换时不会跳。
+## 即梦那张 sit 自带坐垫（画里坐垫中心在底边上方约 12 格），要把它压到背景那只垫子的中心上，
+## 否则客人像是悬在垫子上方；占位的 rest 没有坐垫，仍按脚踩地面线来锚。
 func _set_rest_pose() -> void:
-	sprite.texture = _tex(species, yukata, "rest")
+	var sit := _ai_tex(species, "sit")
+	var tex: Texture2D = sit
+	if tex == null:
+		# derive_rest 那张「脚撑开」的占位：至少和站姿分得开
+		tex = _ai_tex(species, "rest")
+	if tex == null:
+		tex = _tex(species, yukata, "rest")
+	sprite.texture = tex
 	_walk_off = FOOT_PAD - sprite.texture.get_height() * 0.5
+	if sit != null and lounge:
+		_walk_off += SIT_CUSH_SINK
 	sprite.offset = Vector2(0, _walk_off)
 
 func _stay(delta: float) -> void:

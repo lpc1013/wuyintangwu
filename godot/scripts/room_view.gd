@@ -481,9 +481,17 @@ func _build_pools(pool_rects: Array, _types: Array) -> void:
 		# 容量 = 汤种基础位 + 池位等级赠送位，且不超过池子宽度容得下的位数
 		var by_width := maxi(1, int(rect.size.x / SLOT_MIN_WIDTH))
 		var cap := GameData.level_cap(type_id, GameManager.pool_level(GameManager.current_room, i), by_width)
+		var seats: Array = []
+		var all_seats: Array = cfg.get("seats", [])
+		if i < all_seats.size():
+			seats = all_seats[i]
+		# 画好垫子的座席带按垫子数收位：多出来的那位只能坐在光榻榻米上，比少一个位难看得多
+		if not seats.is_empty():
+			cap = mini(cap, seats.size())
 		var taken: Array[bool] = []
 		taken.resize(cap)
-		pools.append({"rect": rect, "cap": cap, "taken": taken, "type": type_id, "by_width": by_width})
+		pools.append({"rect": rect, "cap": cap, "taken": taken, "type": type_id,
+				"by_width": by_width, "seats": seats})
 
 func _build_spawns(spawns: Array) -> void:
 	for i in spawns.size():
@@ -809,6 +817,9 @@ func _apply_pool_cap(pi: int) -> void:
 	var p: Dictionary = pools[pi]
 	var cap := GameData.level_cap(String(p.type),
 			GameManager.pool_level(String(GameManager.current_room), pi), int(p.by_width))
+	var seats: Array = p.get("seats", [])
+	if not seats.is_empty():
+		cap = mini(cap, seats.size())
 	p.cap = cap
 	var taken: Array = p.taken
 	while taken.size() < cap:
@@ -1381,11 +1392,18 @@ func _pick_spawn() -> Vector2:
 func _slot_dict(pi: int, idx: int) -> Dictionary:
 	var rect: Rect2 = pools[pi].rect
 	var cap: int = pools[pi].cap
-	var x := rect.position.x + rect.size.x * (idx + 0.5) / cap
-	var water_y := rect.position.y + rect.size.y * 0.68
+	var seats: Array = pools[pi].get("seats", [])
 	var kind := GameManager.room_kind(GameManager.current_room)
+	# 落座房间坐进背景画好的那只垫子；均分点算在垫子下方的空榻榻米上，
+	# 客人往那儿一戳就是「站着打坐」。没有垫子可指的池子（温泉）才走均分。
+	var on_cushion := idx < seats.size()
+	var x := rect.position.x + rect.size.x * (idx + 0.5) / cap
+	var seat_y := rect.position.y + rect.size.y * 0.68
+	if on_cushion:
+		x = (seats[idx] as Vector2).x
+		seat_y = (seats[idx] as Vector2).y
 	return {
-		"pool": pi, "index": idx, "pos": Vector2(x, water_y), "water_y": water_y,
+		"pool": pi, "index": idx, "pos": Vector2(x, seat_y), "water_y": seat_y,
 		"type": pools[pi].type, "water": kind != "lounge", "kind": kind,
 		"room": GameManager.current_room,
 		"peers": Callable(self, "_count_peers"),
