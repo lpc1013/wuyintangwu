@@ -30,6 +30,14 @@ window/stretch/scale_mode="fractional"
 ; 4 = Sensor Landscape：网页版靠它提示浏览器锁横屏，竖着只会在中间留一条窄画面
 window/handheld/orientation=4
 
+[gui]
+
+; 网页版没有系统字体可借，中文全靠这一张子集像素字体，否则满屏豆腐块
+theme/custom="res://assets/ui/pixel_theme.tres"
+; 1 = None：像素字体关掉抗锯齿才是一格一格的硬边，糊成灰边就白换了
+theme/default_font_antialiasing=1
+theme/default_font_hinting=1
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
