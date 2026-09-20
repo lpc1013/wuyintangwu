@@ -28,6 +28,9 @@ const AI_DIR := "res://assets/animals"
 ## 贴图按最终屏幕像素出图，画布多大就是多大；程序化那套才需要 2 倍放大
 const AI_SCALE := 1.0
 const PROC_SCALE := 2.0
+## 走路图的墨迹上沿在第 14 行，头顶心心原来的 -34/-46 就是照着这一行调的。
+## 别的姿态比这更高（泡澡顶毛巾、盘腿竖耳朵）就按差值把特效整体抬上去。
+const EMOTE_INK_ROW := 14.0
 ## 基准换帧序列：只换抬哪条腿，具体走哪几帧由步态档位给（跳步物种另有 hop 帧）
 const STRIDE := ["stepL", "stepR"]
 
@@ -331,18 +334,21 @@ func _spawn_emote() -> void:
 	emote.scale = Vector2(2, 2)
 	emote.z_index = 1
 	add_child(emote)
+	# 锚点跟着贴图真实上沿抬：泡澡那张头顶有毛巾、盘腿那张耳朵竖着，墨迹比走路图高出一截，
+	# 还按走路图调出来的老数字放，心心就是摁在客人脑门上冒出来的
+	var lift := maxf(0.0, EMOTE_INK_ROW - float(sprite.texture.get_image().get_used_rect().position.y))
 	if lounge:
 		emote.texture = ImageTexture.create_from_image(PixelArt.make_steam_puff())
-		emote.position = Vector2(2, -22)
+		emote.position = Vector2(2, -22.0 - lift)
 		var tw := create_tween()
-		tw.tween_property(emote, "position:y", -34.0, 1.1)
+		tw.tween_property(emote, "position:y", -34.0 - lift, 1.1)
 		tw.parallel().tween_property(emote, "modulate:a", 0.0, 1.1)
 		tw.tween_callback(emote.queue_free)
 		return
 	emote.texture = ImageTexture.create_from_image(PixelArt.make_heart())
-	emote.position = Vector2(0, -34)
+	emote.position = Vector2(0, -34.0 - lift)
 	var tween := create_tween()
-	tween.tween_property(emote, "position:y", -46.0, 0.7)
+	tween.tween_property(emote, "position:y", -46.0 - lift, 0.7)
 	tween.parallel().tween_property(emote, "modulate:a", 0.0, 0.7)
 	tween.tween_callback(emote.queue_free)
 
