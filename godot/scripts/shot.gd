@@ -114,6 +114,10 @@ func _process(_delta: float) -> bool:
 					g._spawn_emote()
 		# 这条分支排在快门那一档前面，自己不按下去就永远等不到：整个进程会吊在那儿
 		if frame >= wait_frames:
+			# 呼吸有没有真的走起来，看 offset 是不是在 -48 上下浮沉，别拿像素猜
+			for g: Node in gait_pals:
+				if is_instance_valid(g):
+					print("SOAK ", g.species, " bob=", g.bob_t, " offset=", g.sprite.offset)
 			_capture()
 	elif frame == wait_frames - 4:
 		_open_panel()

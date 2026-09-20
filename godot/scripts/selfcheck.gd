@@ -397,6 +397,34 @@ func _run_checks() -> int:
 	elif failures == tex_fail:
 		var tail := "" if sit_todo == 0 else "，还差 %d 张 sit" % sit_todo
 		print("OK tex: ", tex_migrated, " 个物种吃贴图，六张姿态同画布", tail)
+	# 泡澡动画：心心要冒在头顶之上，水面也只得有一条。
+	# 锚点按每张图自己的墨迹上沿现算——写死一个高度时，头顶毛巾那几只的心心是摁在肚子上的；
+	# 而即梦那张泡澡图胸口自带水线，再挂一圈程序化水波就是两条水面叠着
+	var soak_fail := failures
+	var soak_checked := 0
+	for id in GameData.SPECIES.keys():
+		if guest_script.call("_ai_tex", String(id), "soak") == null:
+			continue
+		var g: Node2D = guest_script.new()
+		g.setup(String(id), Color.WHITE, Vector2(60.0, 150.0),
+				{"pos": Vector2(60.0, 300.0), "water_y": 300, "type": "hot",
+					"water": true, "room": "rotenburo", "pool": 0}, Vector2(60.0, 40.0))
+		g._set_soak_pose()
+		var spr: Sprite2D = g.sprite
+		var soak_tex: Texture2D = spr.texture
+		var ink_row := float(soak_tex.get_image().get_used_rect().position.y)
+		var ink_top: float = spr.offset.y + ink_row - soak_tex.get_height() * 0.5
+		var anchor := float(g.call("_emote_anchor"))
+		if anchor >= ink_top:
+			printerr("FAIL ", id, " 的心心没冒过头顶: 锚点 ", anchor, " 墨迹上沿 ", ink_top)
+			failures += 1
+		if g.ripple != null:
+			printerr("FAIL ", id, " 吃了泡澡图还挂着程序化水波")
+			failures += 1
+		soak_checked += 1
+		g.free()
+	if failures == soak_fail and soak_checked > 0:
+		print("OK soak: ", soak_checked, " 只下水的心心都冒在毛巾之上，水线一条")
 	if failures > 0:
 		printerr("SELFCHECK FAILED: ", failures)
 	else:
