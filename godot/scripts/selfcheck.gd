@@ -327,10 +327,12 @@ func _run_checks() -> int:
 			room.set("story_queue", [])
 			room.set("_bubble_left", 0.0)
 			room.call("_sync_story_card")
-			var pal := Node2D.new()
-			room.add_child(pal)
-			pal.position = Vector2(120, 260)
-			var off: Vector2 = room.get("BUBBLE_OFFSET")
+			# 气泡贴的是「这颗头」，不是脚边往上数一个固定数：
+			# 柴犬头顶到第 1 行、企鹅到第 30 行，同一个数字必然一头压脸、一头吊在半空
+			var gs := load("res://scripts/guest.gd") as GDScript
+			var pal := _bare_guest(gs, "shib", Vector2(120, 260))
+			var off: Vector2 = room.get("BUBBLE_OFFSET") + Vector2(0, float(pal.call("head_y")))
+			var box_h: float = 40.0
 			room.call("_bubble", pal, "水有点烫")
 			var bub: Label = room.get("bubble_label")
 			if bub == null:
@@ -339,31 +341,35 @@ func _run_checks() -> int:
 			elif bub.get_parent() != layer:
 				printerr("FAIL 气泡还挂在客人身上: ", bub.get_parent())
 				failures += 1
-			# 挂 HUD 就不再生在客人身上，位置得靠每帧贴；漏了这一步气泡会钉在原地
-			elif bub.position != Vector2(120, 260) + off:
-				printerr("FAIL 气泡没贴到客人头顶: ", bub.position)
+			elif bub.position.y + box_h >= pal.position.y + float(pal.call("head_y")):
+				printerr("FAIL 气泡文字压在了柴犬头顶上: ", bub.position)
 				failures += 1
+			# 挂 HUD 就不再生在客人身上，位置得靠每帧贴；漏了这一步气泡会钉在原地
 			else:
 				pal.position = Vector2(300, 200)
 				room.call("_sync_bubble")
 				if bub.position != Vector2(300, 200) + off:
 					printerr("FAIL 客人走开气泡没跟上: ", bub.position)
 					failures += 1
-			# 交接那一帧：第二颗必须换成新宿主，旧气泡的收尾不许把刚接上的那颗摘掉
-			var pal2 := Node2D.new()
-			room.add_child(pal2)
-			pal2.position = Vector2(500, 320)
+			# 交接那一帧：第二颗必须换成新宿主，并按新宿主自己的头顶重算
+			var pal2 := _bare_guest(gs, "peng", Vector2(500, 320))
 			room.set("_bubble_left", 0.0)
 			room.call("_bubble", pal2, "换人了")
 			var bub2: Label = room.get("bubble_label")
+			var off2: Vector2 = room.get("BUBBLE_OFFSET") + Vector2(0, float(pal2.call("head_y")))
 			if room.get("bubble_host") != pal2 or bub2 == bub:
 				printerr("FAIL 新气泡没接上新宿主")
 				failures += 1
-			elif bub2.position != Vector2(500, 320) + off:
+			elif bub2.position != Vector2(500, 320) + off2:
 				printerr("FAIL 新气泡没贴到新宿主头顶: ", bub2.position)
 				failures += 1
+			elif off2 == off:
+				printerr("FAIL 换物种锚点没变，头顶根本没现量")
+				failures += 1
+			pal.free()
+			pal2.free()
 			if failures == lift_fail:
-				print("OK lift: indoor 飘字与气泡抬到夜罩之上，气泡跟着客人走")
+				print("OK lift: indoor 飘字与气泡抬到夜罩之上，气泡按每只自己的头顶贴")
 		room.queue_free()
 	# 贴图迁移：一个物种一旦吃了贴图，六张必须同画布——混进一张程序化图，
 	# 迈步时就是两档像素密度来回跳，玩家看到的不是换腿而是整只抖动。
@@ -405,20 +411,14 @@ func _run_checks() -> int:
 	for id in GameData.SPECIES.keys():
 		if guest_script.call("_ai_tex", String(id), "soak") == null:
 			continue
-		var g: Node2D = guest_script.new()
-		g.setup(String(id), Color.WHITE, Vector2(60.0, 150.0),
-				{"pos": Vector2(60.0, 300.0), "water_y": 300, "type": "hot",
-					"water": true, "room": "rotenburo", "pool": 0}, Vector2(60.0, 40.0))
-		g._set_soak_pose()
-		var spr: Sprite2D = g.sprite
-		var soak_tex: Texture2D = spr.texture
-		var ink_row := float(soak_tex.get_image().get_used_rect().position.y)
-		var ink_top: float = spr.offset.y + ink_row - soak_tex.get_height() * 0.5
+		var g := _bare_guest(guest_script, String(id), Vector2(60.0, 150.0))
+		g.call("_set_soak_pose")
 		var anchor := float(g.call("_emote_anchor"))
+		var ink_top := float(g.call("head_y"))
 		if anchor >= ink_top:
 			printerr("FAIL ", id, " 的心心没冒过头顶: 锚点 ", anchor, " 墨迹上沿 ", ink_top)
 			failures += 1
-		if g.ripple != null:
+		if g.get("ripple") != null:
 			printerr("FAIL ", id, " 吃了泡澡图还挂着程序化水波")
 			failures += 1
 		soak_checked += 1
@@ -430,6 +430,14 @@ func _run_checks() -> int:
 	else:
 		print("SELFCHECK PASSED")
 	return 1 if failures > 0 else 0
+
+## 造一个不落地的客人：只为了有一张可量的 sprite，不必进树也不必将就席位表。
+## 返回类型不能写 Guest——自检是 --script 入口，静态引它就等于在自动加载注册前编译它
+static func _bare_guest(guest_script: GDScript, sp: String, pos: Vector2) -> Node2D:
+	var g: Node2D = guest_script.new()
+	g.setup(sp, Color.WHITE, pos, {"pos": pos, "water_y": 300, "type": "hot",
+			"water": true, "room": "rotenburo", "pool": 0}, pos + Vector2(0, 60))
+	return g
 
 func _count(node: Node) -> int:
 	var total := 1
