@@ -28,9 +28,11 @@ const AI_DIR := "res://assets/animals"
 ## 贴图按最终屏幕像素出图，画布多大就是多大；程序化那套才需要 2 倍放大
 const AI_SCALE := 1.0
 const PROC_SCALE := 2.0
-## 走路图的墨迹上沿在第 14 行，头顶心心原来的 -34/-46 就是照着这一行调的。
-## 别的姿态比这更高（泡澡顶毛巾、盘腿竖耳朵）就按差值把特效整体抬上去。
-const EMOTE_INK_ROW := 14.0
+## 心心/热气悬在客人可见墨迹上沿之外的余量，以及它一路上浮的距离。
+## 锚点必须现算：画布统一 96 行，可乌龟的毛巾顶到第 10 行、企鹅的冻鱼只到第 64 行，
+## 原来写死的 -34 刚好合企鹅的身量，乌龟的心心就摁在了肚子上
+const EMOTE_CLEAR := 2.0
+const EMOTE_RISE := 12.0
 ## 基准换帧序列：只换抬哪条腿，具体走哪几帧由步态档位给（跳步物种另有 hop 帧）
 const STRIDE := ["stepL", "stepR"]
 
@@ -76,6 +78,8 @@ var _stepping_out := true
 var _murmured := false
 var _step_out_pos := Vector2.ZERO
 var _walk_off := 0.0
+## 泡汤姿态的基准 offset：画布底边压在节点上，呼吸只在这基础上浮 1 像素
+var _soak_off := 0.0
 ## 精灵放大倍率：程序化 2 倍、贴图 1 倍。沉浮与摆幅写在精灵局部坐标里，
 ## 不乘回这个倍率，换成贴图后同样的档位数值在屏幕上只晃一半
 var tex_scale := PROC_SCALE
@@ -231,7 +235,12 @@ func _take_seat() -> void:
 func _set_soak_pose() -> void:
 	sprite.texture = _tex(species, yukata, "soak")
 	# 泡汤图的水线在画布底部，直接让底边贴住节点 y
-	sprite.offset = Vector2(0, -sprite.texture.get_height() * 0.5)
+	_soak_off = -sprite.texture.get_height() * 0.5
+	sprite.offset = Vector2(0, _soak_off)
+	# 即梦那张泡澡图胸口本来就画了一条水线，再套一圈程序化水波就是两条水面叠着；
+	# 只有还在用程序化占位的物种需要这圈波来交代「浸在水里」
+	if sprite.texture == _ai_tex(species, "soak"):
+		return
 	ripple = Sprite2D.new()
 	ripple.texture = ImageTexture.create_from_image(PixelArt.make_ripple(30))
 	ripple.scale = Vector2(2, 2)
@@ -263,8 +272,11 @@ func _stay(delta: float) -> void:
 	if lounge:
 		# 坐着不动会像贴图，让身子随呼吸一涨一落
 		sprite.offset = Vector2(0, _walk_off + round(sin(bob_t)))
-	elif ripple:
-		ripple.modulate.a = 0.65 + 0.35 * sin(bob_t)
+	else:
+		# 泡汤的整只随水面轻轻起伏；bob_t 按 3 倍速走，乘 0.4 压回五秒一轮的呼吸感
+		sprite.offset = Vector2(0, _soak_off + round(sin(bob_t * 0.4)))
+		if ripple:
+			ripple.modulate.a = 0.65 + 0.35 * sin(bob_t)
 	coin_left -= delta
 	if coin_left <= 0.0:
 		coin_left = coin_every
@@ -334,23 +346,28 @@ func _spawn_emote() -> void:
 	emote.scale = Vector2(2, 2)
 	emote.z_index = 1
 	add_child(emote)
-	# 锚点跟着贴图真实上沿抬：泡澡那张头顶有毛巾、盘腿那张耳朵竖着，墨迹比走路图高出一截，
-	# 还按走路图调出来的老数字放，心心就是摁在客人脑门上冒出来的
-	var lift := maxf(0.0, EMOTE_INK_ROW - float(sprite.texture.get_image().get_used_rect().position.y))
+	var anchor := _emote_anchor()
 	if lounge:
 		emote.texture = ImageTexture.create_from_image(PixelArt.make_steam_puff())
-		emote.position = Vector2(2, -22.0 - lift)
+		emote.position = Vector2(2, anchor + EMOTE_RISE)
 		var tw := create_tween()
-		tw.tween_property(emote, "position:y", -34.0 - lift, 1.1)
+		tw.tween_property(emote, "position:y", anchor, 1.1)
 		tw.parallel().tween_property(emote, "modulate:a", 0.0, 1.1)
 		tw.tween_callback(emote.queue_free)
 		return
 	emote.texture = ImageTexture.create_from_image(PixelArt.make_heart())
-	emote.position = Vector2(0, -34.0 - lift)
+	emote.position = Vector2(0, anchor)
 	var tween := create_tween()
-	tween.tween_property(emote, "position:y", -46.0 - lift, 0.7)
+	tween.tween_property(emote, "position:y", anchor - EMOTE_RISE, 0.7)
 	tween.parallel().tween_property(emote, "modulate:a", 0.0, 0.7)
 	tween.tween_callback(emote.queue_free)
+
+## 当前姿态的墨迹上沿，换算到客人自己的坐标系
+func _emote_anchor() -> float:
+	var tex := sprite.texture
+	var ink_row := float(tex.get_image().get_used_rect().position.y)
+	var ink_top := sprite.offset.y + (ink_row - tex.get_height() * 0.5) * sprite.scale.y
+	return ink_top - EMOTE_CLEAR
 
 func _depart() -> void:
 	reviewed.emit(self, star_rating(), wish_id, wish_done)
