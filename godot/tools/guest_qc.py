@@ -7,6 +7,11 @@ poseΔ 只算走路周期那六张：sit 和它们本来就长得不一样，混
 掩盖走路六张里真正掺水的那对。sit 只盯一条——剪影不能比 walk 还高，产线把内容塞进
 固定画布，原图画高了客人一坐下就当场长大一号；像不像坐下、颜色串没串，看拼条那一列。
 
+soak 从「rest 改色占位」升级成第八张即梦原图以后也上了一条自己的闸：画布底边就是水面，
+墨迹顶行报出来给肉眼复核（顶到第 0 行才算坏事——那是毛巾被画布裁掉了）。头顶心心原来
+挂在席位上方 34 像素，是按走路图的第 14 行调的，泡澡图爱把毛巾画得更高，所以引擎现在
+自己按差值抬特效，越线不再是缺陷。
+
 poseΔ 用像素差而非剪影重合度：走路周期六张的轮廓本来就挨得近，剪影重合度全员
 96% 以上，区分不出「腿换了个位置」和「干脆复制了一份」。差的那部分集中在
 y=80~95 的脚部带上，所以 poseΔ 低到 1~2% 也未必是错——水豚是「温吞哲学派」，
@@ -37,6 +42,12 @@ SIT = "sit"
 ## 两条指标量的其实都只是「蹲下来之后面积重新分布了多少」——大耳朵把宽比压下去，
 ## 坐垫和正脸把配色交叠压下去，误伤率百分之百，于是只留这一条。
 SIT_GROW = 1.10
+
+## soak 的墨迹顶行高于这条线就单独标出来：走路图的墨迹上沿在第 14 行，头顶的爱心
+## 特效（guest.gd 的 EMOTE_INK_ROW）照着它调，泡澡原图爱把毛巾、大耳朵画得更高。
+## 引擎现在会按差值自己把特效抬上去，所以越线只是「这张画得比站姿高」的提示；
+## 真要出问题的是顶到第 0 行——那说明毛巾被画布裁掉了一截。
+SOAK_TOP = 14
 
 
 def stats(path):
@@ -119,6 +130,12 @@ def main():
             paste_cell(sheet, sit_path, r, len(POSES))
             wk = silhouette_height(os.path.join(ANIM, "%s_walk.png" % sid))
             sit = silhouette_height(sit_path) / float(wk or 1)
+        # soak 的墨迹顶行单独量：union bbox 里那一条被走路六张压着，看不出泡澡这张自己顶到哪
+        soak_top = None
+        soak_path = os.path.join(ANIM, "%s_soak.png" % sid)
+        if os.path.exists(soak_path):
+            sb = Image.open(soak_path).convert("RGBA").getchannel("A").getbbox()
+            soak_top = sb[1] if sb else CELL[1]
         top = min(b[1] for b in boxes)
         foot = max(b[3] for b in boxes)
         left = min(b[0] for b in boxes)
@@ -126,14 +143,15 @@ def main():
         foot_spread = max(b[3] for b in boxes) - min(b[3] for b in boxes)
         pa, pb, dv = closest_pair(masks) if len(masks) > 1 else ("", "", 2.0)
         rows.append((sid, len(boxes), missing, (left, top, right, foot), foot_spread,
-                     min(fills), max(fills), "%.1f%% %s/%s" % (dv * 100, pa, pb), dv, sit))
+                     min(fills), max(fills), "%.1f%% %s/%s" % (dv * 100, pa, pb), dv, sit,
+                     soak_top))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     sheet.save(OUT)
     print("sheet ->", os.path.normpath(OUT), sheet.size)
-    print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %s" % (
-        "id", "poses", "foot±", "union bbox", "fill%", "poseΔ", "sit高比", "missing"))
-    dups, bad_sit = [], []
-    for sid, n, missing, ub, fs, fmin, fmax, pose_delta, dv, sit in rows:
+    print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %-7s %s" % (
+        "id", "poses", "foot±", "union bbox", "fill%", "poseΔ", "sit高比", "soak顶", "missing"))
+    dups, bad_sit, high_soak, tall_soak = [], [], [], []
+    for sid, n, missing, ub, fs, fmin, fmax, pose_delta, dv, sit, soak_top in rows:
         flag = []
         if missing:
             flag.append(" ".join(missing))
@@ -146,9 +164,18 @@ def main():
             sit_col = "%.2f" % sit
             if sit > SIT_GROW:
                 bad_sit.append((sid, sit))
-        print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %s" % (
+        if soak_top is None:
+            flag.append("缺 soak")
+            soak_col = "-"
+        else:
+            soak_col = "%dpx" % soak_top
+            if soak_top <= 0:
+                high_soak.append((sid, soak_top))
+            elif soak_top < SOAK_TOP:
+                tall_soak.append((sid, soak_top))
+        print("%-6s %-5s %-6s %-22s %-6s %-18s %-8s %-7s %s" % (
             sid, "%d/6" % n, "%dpx" % fs, str(ub), "%.1f-%.1f" % (fmin * 100, fmax * 100),
-            pose_delta, sit_col, " ".join(flag)))
+            pose_delta, sit_col, soak_col, " ".join(flag)))
         if dv < DUP_DIFF:
             dups.append((sid, pose_delta))
     if dups:
@@ -159,6 +186,14 @@ def main():
         print("\n坐下长大一号（sit 剪影比 walk 还高，换一张 alt 重落）：")
         for sid, grow in bad_sit:
             print("  %-6s 高比 %.2f（线 %.2f）" % (sid, grow, SIT_GROW))
+    if high_soak:
+        print("\n画布裁到头（soak 墨迹贴着画布顶边，毛巾或耳朵被切了，换 alt 重落）：")
+        for sid, top in high_soak:
+            print("  %-6s 顶行 %dpx" % (sid, top))
+    if tall_soak:
+        print("\n画得比站姿高（soak 墨迹越过第 %d 行，特效锚点由引擎自动抬，仅供肉眼复核）：" % SOAK_TOP)
+        for sid, top in tall_soak:
+            print("  %-6s 顶行 %dpx" % (sid, top))
 
 
 main()

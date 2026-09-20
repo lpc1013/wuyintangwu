@@ -5,13 +5,14 @@ extends SceneTree
 ## APPDATA 必须改指：4.7 已没有 --user-dir 参数，存档默认落在玩家真实进度目录。
 ## hour/time_scale 用来验证昼夜时段与夜罩；toast_text 仅用于检查提示条排版。
 ## panel 取 build:<id> / expand / report / float / gait / review:<星级> / story:<mode>[:<物种>]
-## / maphint，分别检查建造调色板、扩建面板、每日结算弹窗、金币飘字、步态连拍、
-## 点评条配色、剧情界面，以及案内图上点锁着的房间那一下
-## （maphint 配 rep:<声望> 用，target 给 res://scenes/map.tscn）。
+## / maphint / soak:<物种+物种>，分别检查建造调色板、扩建面板、每日结算弹窗、金币飘字、
+## 步态连拍、点评条配色、剧情界面、案内图上点锁着的房间那一下，
+## 以及泡澡贴图在真实渲染下的样子（soak 配 room:<浴室id> 用）。
 ## story 的 mode：chat 对白卡、chapter 章节卡、bubble 头顶气泡、mail 信箱列表、letter 单封信正文。
 ## gait 是步态实验台：自己往房间里放几位指定物种的客人并排走，
 ## 攒成一张「行=物种、列=时刻」的胶片直接写进 out_png（不带 %d）。
 ## 想换比较对象就写成 gait:bear+duck+cat3，不给名单则用六个档位的代表物种。
+## maphint 用 res://scenes/map.tscn 当 target，配 rep:<声望> 才看得出「还差多少」。
 
 var frame := 0
 var target := "res://scenes/title.tscn"
@@ -78,6 +79,11 @@ func _initialize() -> void:
 			panel_mode = "gait"
 			if extra.length() > 5:
 				gait_ids = extra.substr(5).split("+")
+		elif extra.begins_with("soak"):
+			# soak:capy+bear —— 把名单里的物种直接按进本房间的汤池席位，拍真实渲染下的泡澡图
+			panel_mode = "soak"
+			if extra.length() > 5:
+				gait_ids = extra.substr(5).split("+")
 		elif extra.begins_with("review"):
 			panel_mode = "review"
 			# review:2 这样的尾巴用来换星级，三档配色各拍一张才看得出差别
@@ -97,6 +103,18 @@ func _process(_delta: float) -> bool:
 		_try_bubble()
 	elif panel_mode == "gait":
 		_try_gait()
+	elif panel_mode == "soak":
+		if frame == 3:
+			_spawn_soak_pals()
+		_mask_strangers()
+		if frame == wait_frames - 20:
+			# 抢在快门前三格放一次心心：这张要验的就是特效锚点跟没跟上加高的毛巾
+			for g: Node in gait_pals:
+				if is_instance_valid(g):
+					g._spawn_emote()
+		# 这条分支排在快门那一档前面，自己不按下去就永远等不到：整个进程会吊在那儿
+		if frame >= wait_frames:
+			_capture()
 	elif frame == wait_frames - 4:
 		_open_panel()
 	elif frame >= wait_frames:
@@ -112,7 +130,8 @@ func _boot() -> void:
 	if target.begins_with("room:"):
 		gm.current_room = target.substr(5)
 		target = "res://scenes/room.tscn"
-	if (panel_mode == "story" or panel_mode == "gait" or panel_mode == "review") and start_hour < 0.0:
+	if (panel_mode == "story" or panel_mode == "gait" or panel_mode == "review"
+			or panel_mode == "soak") and start_hour < 0.0:
 		# 剧情、步态与点评条截图都撞不得跨天：结算弹窗会暂停整棵树，顺带把整个画面盖掉
 		start_hour = 10.0
 	if start_hour >= 0.0:
@@ -381,6 +400,38 @@ func _spawn_pals() -> void:
 					"room": room_id, "pool": 0}, Vector2(x, 620.0))
 		current_scene.add_child(g)
 		gait_pals.append(g)
+
+## 泡汤实拍：名单里的物种各占一个本房间的真实汤池席位。
+## 走 room 自己的 pools + _slot_dict，不手拼坐标——换房间、改池子位置都不用回来动这里；
+## 占下的席位要标 taken，否则房间的刷新钟会把同一格里再塞一位，两张图叠在一起。
+func _spawn_soak_pals() -> void:
+	var guest_script := load("res://scripts/guest.gd") as GDScript
+	var scene: Node = current_scene
+	var pools: Array = scene.get("pools")
+	var take := 0
+	for pi in pools.size():
+		var taken: Array = pools[pi].taken
+		for idx in taken.size():
+			if take >= gait_ids.size():
+				break
+			if bool(taken[idx]):
+				continue
+			var id := String(gait_ids[take])
+			taken[idx] = true
+			if GameData.species(id).is_empty():
+				print("SOAK 物种不存在: ", id)
+			else:
+				var g: Node2D = guest_script.new()
+				g.setup(id, PixelArt.YUKATA[take % PixelArt.YUKATA.size()], Vector2(60.0, 150.0),
+						scene.call("_slot_dict", pi, idx), Vector2(60.0, 40.0))
+				scene.add_child(g)
+				# 不等他从门口走完：泡汤窗口只有 7~13 秒，走完就没剩多少可拍。
+				# 直接落位并把停留时长钉住，快门什么时候按他都在水里
+				g._take_seat()
+				g.stay_left = 600.0
+				gait_pals.append(g)
+			take += 1
+	print("SOAK 下水 ", gait_pals.size(), " 位 / 名单 ", gait_ids.size(), " 位")
 
 func _finish_gait() -> void:
 	for g: Node in gait_pals:

@@ -294,7 +294,8 @@ def landing_factor(src: str, block: int, cw: int, ch: int) -> int:
 
 
 def run_one(src: str, species: str, pose: str, cw: int, ch: int, colors: int,
-            outdir: str, keep_debug: str = "", anchor: str = "") -> None:
+            outdir: str, keep_debug: str = "", anchor: str = "",
+            raw_dir: str = "vibe_images/ai_raw") -> None:
     keyed = key_out(Image.open(src))
     block = measure_block(Image.open(src).convert("RGB"))
     box = snap_bbox(keyed, block)
@@ -321,7 +322,7 @@ def run_one(src: str, species: str, pose: str, cw: int, ch: int, colors: int,
     extra = []
     if pose == "walk":
         extra = derive_stride(final, outdir, species)
-        soak = derive_soak(final, outdir, species)
+        soak = "" if find_raw(species, "soak", raw_dir) else derive_soak(final, outdir, species)
         rest = derive_rest(final, outdir, species)
         extra += [v for v in (soak, rest) if v]
     print(f"OK {dst} block={block}px factor={factor} srcBox={box} "
@@ -348,6 +349,17 @@ def find_walk(base: str, raw_dir: str) -> str:
     return ""
 
 
+def find_raw(base: str, pose: str, raw_dir: str) -> str:
+    """这只的这个姿态有没有即梦原图：walk 平铺在 raw_dir 下，其余姿态各占一个同名子目录。"""
+    if pose == "walk":
+        return find_walk(base, raw_dir)
+    for ext in RAWS:
+        p = os.path.join(raw_dir, pose, base + ext)
+        if os.path.exists(p):
+            return p
+    return ""
+
+
 def batch(indir: str, outdir: str, cw: int, ch: int, colors: int, pose: str = "walk",
           raw_dir: str = "vibe_images/ai_raw") -> int:
     """扫目录里的 <物种>.<ext>：walk 一只一张就够，另外五帧全由它推出来。
@@ -365,7 +377,7 @@ def batch(indir: str, outdir: str, cw: int, ch: int, colors: int, pose: str = "w
         if ext.lower() not in RAWS:
             continue
         run_one(os.path.join(indir, name), base, pose, cw, ch, colors, outdir,
-                anchor=find_walk(base, raw_dir))
+                anchor=find_walk(base, raw_dir), raw_dir=raw_dir)
         done.append(base)
     print(f"BATCH {len(done)} 只 {pose} 落位：{done}")
     if not done:
@@ -432,14 +444,37 @@ SIZE_CN = [(0.9, "很小一只，只占画面高度约五成，蹲在画面下�
            (1.25, "偏大一只，占画面高度约七成五"),
            (9.9, "壮硕一大只，几乎占满画面高度")]
 
-## 姿态名 → （怎么摆, 允许出现的道具）。sit 是茶室专用的第七张：
+## 姿态名 → （怎么摆, 允许出现的道具, 穿什么）。sit 是茶室专用的第七张：
 ## derive_rest 那张占位只是把脚撑开，客人坐在榻榻米上仍像站着，所以单独要一张真盘腿。
+## soak 是汤池里的第八张：派生图只是把站姿拦腰切一刀，既没脱浴衣也没顶毛巾，
+## 客人看着仍像站在池子里，所以这张也得要原图。
 POSE_CN = {
     "walk": ("正面朝向观众直立站姿，双脚分开站稳，全身完整入画，不要侧身不要俯视",
-             "没有任何道具"),
+             "没有任何道具",
+             "身穿浅蓝白色日式浴衣，腰间系同色腰带"),
     "sit": ("正面朝向观众盘腿而坐，两膝向外摊开，双脚（前爪）收拢在身前，"
             "屁股压在一只方形坐垫上，双手自然搭在膝头，全身完整入画，不要侧身不要俯视",
-            "唯一允许的道具是屁股下那只方形坐垫，坐垫面是橙褐色、中间一道深褐色束带，除此之外没有任何道具"),
+            "唯一允许的道具是屁股下那只方形坐垫，坐垫面是橙褐色、中间一道深褐色束带，除此之外没有任何道具",
+            "身穿浅蓝白色日式浴衣，腰间系同色腰带"),
+    "soak": ("正面朝向观众泡在热水里，只画水面以上的脑袋和光着的肩背，"
+             "下半身整个没入水下不入画，{head}，"
+             "水面只是贴着胸口的一条浅蓝波纹细线，线以下保持纯白背景，"
+             "不要画成片的蓝色水块、不要画浴缸、不要画水花，"
+             "双眼闭着，神情松弛享受，不要侧身不要俯视",
+             "唯一允许的道具就是头顶那样东西，身上没有肥皂泡、没有其它任何道具",
+             "光着上半身，不穿浴衣也不穿任何衣物，胸口的毛色与肚皮同色"),
+}
+## 泡澡帧默认顶的是毛巾（程序化那版也是白底一道浅蓝横条）
+SOAK_TOWEL = "头顶叠一条白色毛巾，毛巾中间一道浅蓝横条"
+## 彩蛋：这几只不顶毛巾，头顶换成自己那句剧情里的东西。
+## 换的只有提示词，水线、比例锚、落位一视同仁。
+SOAK_HEAD = {
+    # 「远道来的」：拖着箱角结盐霜的行李箱走了四十天，顺手从海里叼了条鱼
+    "peng": "头顶顶一条冻硬的小银鱼，鱼身笔直，不是毛巾",
+    # 「泡哪儿都一样」：水豚泡温泉顶柚子，是这行的老规矩
+    "capy": "头顶顶一颗圆滚滚的黄柚子，不是毛巾",
+    # 「只认一种叶子」：别的叶子它不碰，泡澡也得带着
+    "koal": "头顶搭一枝带着两片叶子的桉树枝，不是毛巾",
 }
 
 
@@ -451,14 +486,16 @@ def prompt_for(sp: dict, pose: str = "walk") -> str:
         look.append(f"一张 {sp['beak']} 色的小尖喙")
     if sp["id"] in MARK_CN:
         look.append(MARK_CN[sp["id"]])
-    stance, prop = POSE_CN[pose]
+    stance, prop, wear = POSE_CN[pose]
+    if pose == "soak":
+        stance = stance.format(head=SOAK_HEAD.get(sp["id"], SOAK_TOWEL))
     bits = [
         "复古日式像素风游戏精灵图",
         f"{sp['name']}（{sp['perso']}）",
         stance,
         f"毛色 {sp['body']}，肚皮与口鼻 {sp['belly']}，耳朵内侧与描边 {sp['dark']}",
         "、".join(look),
-        "身穿浅蓝白色日式浴衣，腰间系同色腰带",
+        wear,
         "大方块像素、粗深色描边、赛璐璐平涂、无渐变无抖动",
         f"纯白背景，画面里只有这一个角色，没有地面阴影没有文字，{prop}",
         frac,
@@ -466,19 +503,17 @@ def prompt_for(sp: dict, pose: str = "walk") -> str:
     return "，".join(bits) + "。"
 
 
-def emit_prompts(outdir: str, data_gd: str, json_out: str = "", raw_dir: str = "vibe_images/ai_raw",
+def emit_prompts(data_gd: str, json_out: str = "", raw_dir: str = "vibe_images/ai_raw",
                  pose: str = "walk") -> int:
-    """给还没落位这个姿态的物种各印一条可直接粘进即梦的提示词。
+    """给还没原图这个姿态的物种各印一条可直接粘进即梦的提示词。
 
-    outdir 是「已落位」的判据目录（贴图所在地），raw_dir 只是告诉人去哪儿存原图——
-    两者搞成一个，--outdir 一换就变成「一只都没落位」。
+    判据是**原图在不在**，不是贴图在不在：soak 那档的贴图早被 derive_soak 铺满 30 张
+    占位（拦腰切一刀的站姿），拿贴图当判据会当场报「一只都不用生」，而那批占位恰恰是
+    要被真原图替掉的东西。raw_dir 一栏同时管着「去哪儿取」与「去哪儿存」。
     json_out 是给浏览器自动化读的：控制台那份在 cp936 下会糊成一团，
     而且提示词本就没有重打一遍的必要。
     """
-    todo = []
-    for sp in read_roster(data_gd):
-        if not os.path.exists(os.path.join(outdir, f"{sp['id']}_{pose}.png")):
-            todo.append(sp)
+    todo = [sp for sp in read_roster(data_gd) if not find_raw(sp["id"], pose, raw_dir)]
     if json_out:
         with open(json_out, "w", encoding="utf-8") as f:
             json.dump([{"id": sp["id"], "name": sp["name"], "pose": pose,
@@ -489,12 +524,13 @@ def emit_prompts(outdir: str, data_gd: str, json_out: str = "", raw_dir: str = "
                        for sp in todo], f, ensure_ascii=False, indent=1)
         print(f"PROMPT {len(todo)} 条已写入 {json_out}")
     if not todo:
-        print(f"PROMPT 全部 {len(read_roster(data_gd))} 个物种的 {pose} 都已落位，不用再生图")
+        print(f"PROMPT 全部 {len(read_roster(data_gd))} 个物种的 {pose} 原图都齐了，不用再生图")
         return 0
     print(f"PROMPT 还差 {len(todo)} 只的 {pose}（即梦：图片生成 · 5.0 Lite · 3:4 · 纯白底"
           + ("· 拿自己的 walk 原图当参考图）" if pose != "walk" else "）"))
     for sp in todo:
-        print(f"\n[{sp['id']}] {sp['name']}  →  存成 {sp['id']}.webp 放进 {raw_dir}")
+        stem = f"{pose}/{sp['id']}.webp" if pose != "walk" else f"{sp['id']}.webp"
+        print(f"\n[{sp['id']}] {sp['name']}  →  存成 {stem} 放进 {raw_dir}")
         print(prompt_for(sp, pose))
     return 0
 
@@ -510,7 +546,7 @@ def main() -> int:
     ap.add_argument("--batch", default="", help="目录里放 <物种>.webp，一次跑完整个 --pose 套件")
     ap.add_argument("--pose", dest="art_pose", default="walk",
                     help="--prompts 与 --batch 处理哪个姿态，默认 walk")
-    ap.add_argument("--prompts", action="store_true", help="列出还没落位的物种的即梦提示词")
+    ap.add_argument("--prompts", action="store_true", help="列出还没原图的物种的即梦提示词")
     ap.add_argument("--prompts-json", default="", help="把待办提示词写成 UTF-8 JSON，给浏览器自动化读")
     ap.add_argument("--raw-dir", default="vibe_images/ai_raw",
                     help="walk 原图目录：提示文案去哪儿找它，非 walk 姿态就拿它当比例锚")
@@ -520,8 +556,7 @@ def main() -> int:
 
     cw, ch = (int(v) for v in args.canvas.lower().split("x"))
     if args.prompts or args.prompts_json:
-        return emit_prompts(args.outdir, args.data, args.prompts_json, args.raw_dir,
-                            args.art_pose)
+        return emit_prompts(args.data, args.prompts_json, args.raw_dir, args.art_pose)
     if args.batch:
         return batch(args.batch, args.outdir, cw, ch, args.colors, args.art_pose,
                      args.raw_dir)

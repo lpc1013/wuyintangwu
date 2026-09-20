@@ -52,3 +52,5 @@ godot/assets/animals/*.import
 vibe_images/ai_raw/todo.json
 vibe_images/ai_raw/sit_todo.json
 vibe_images/ai_raw/sit_fail.json
+vibe_images/ai_raw/soak_todo.json
+vibe_images/ai_raw/soak_fail.json
