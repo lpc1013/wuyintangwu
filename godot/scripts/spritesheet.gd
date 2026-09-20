@@ -1,5 +1,5 @@
 extends SceneTree
-## 导出精灵对照表：名册里每一只 × (站立 / 迈步两帧 / 腾空 / 泡汤 / 落座)，用于逐物种验收造型。
+## 导出精灵对照表：名册里每一只 × (站立 / 迈步两帧 / 腾空 / 泡汤 / 落座 / 盘坐)，用于逐物种验收造型。
 ## 走 Guest._tex 而不是直接画 PixelArt：迁到贴图的物种要看见贴图，画程序化那套等于没验收。
 ## 用法：APPDATA=<仓库>/godot/tools/_userdata Godot_console.exe --headless --path godot --script res://scripts/spritesheet.gd
 ## APPDATA 必须改指：4.7 已没有 --user-dir 参数，存档默认落在玩家真实进度目录。
@@ -11,7 +11,8 @@ const CELL := 200
 const SCALE := 2
 ## 三张行走帧并排才看得出步态差多少：同一只动物的 walk / stepL / stepR 落在同格列的三个区块里。
 ## hop 只有兔与蛙用得上，但每只都画一份，才能一眼看出某档是不是该有这一帧。
-const POSES := ["walk", "stepL", "stepR", "hop", "soak", "rest"]
+## sit 走 _ai_tex 而不是 _tex：缺帧兜底会拿 walk 顶上来，那一格就永远看不出还没生图。
+const POSES := ["walk", "stepL", "stepR", "hop", "soak", "rest", "sit"]
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -34,9 +35,15 @@ func _run() -> void:
 		var sc := int(guest_script.call("tex_scale_for", id))
 		for p in POSES.size():
 			var pose: String = POSES[p]
-			# 同一只动物五个姿态共用一件浴衣：换了颜色就没法直接比出三帧行走的差别
+			# 同一只动物几个姿态共用一件浴衣：换了颜色就没法直接比出三帧行走的差别
 			var yukata: Color = PixelArt.YUKATA[i % PixelArt.YUKATA.size()]
-			var tex: Texture2D = guest_script.call("_tex", id, yukata, pose)
+			var tex: Texture2D
+			if pose == "sit":
+				tex = guest_script.call("_ai_tex", id, pose)
+			else:
+				tex = guest_script.call("_tex", id, yukata, pose)
+			if tex == null:
+				continue
 			var w := tex.get_image().get_width() * sc
 			var h := tex.get_image().get_height() * sc
 			var ox := ((p * COLS + c) + 1) * CELL + (CELL - w * SCALE) / 2

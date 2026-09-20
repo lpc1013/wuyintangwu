@@ -46,6 +46,9 @@ __pycache__/
 # 把干净工作区冲成一片。assets/bg 那些是 load() 进来的，那边 .import 必须入库，此处正相反。
 godot/assets/animals/*.import
 
-# 即梦派工清单：sprite_from_ai.py --prompts 重跑一次就按名册重新生成，不入库。
+# 即梦派工清单与抽卡重试点数：sprite_from_ai.py --prompts 重跑一次就按名册重新生成，
+# jimeng_sit.js 的失败计数删了也只是从头再抽一次，都不必入库。
 # 但同目录的 <id>.webp 与 alt/ 必须入库——那是即梦原图，生成不可复现，删了只能重抽赌脸。
 vibe_images/ai_raw/todo.json
+vibe_images/ai_raw/sit_todo.json
+vibe_images/ai_raw/sit_fail.json
