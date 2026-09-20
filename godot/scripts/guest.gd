@@ -52,6 +52,8 @@ var wish_id := "photo"
 var wish_done := false
 var affinity := 0
 var slot := {}
+## 进屋那句自我介绍没播完的部分：玩家点他一下才展开，没人点就随他离店
+var pending_intro := {}
 var target := Vector2.ZERO
 var exit_pos := Vector2.ZERO
 var lounge := false

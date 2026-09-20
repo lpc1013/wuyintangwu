@@ -227,7 +227,7 @@ func _show_story_panel() -> void:
 				line = all[0] if not all.is_empty() else {}
 			print("STORY chat ", story_species, " segs=", Story.segments(line).size())
 			current_scene._say(String(GameData.species(story_species).get("name", story_species)),
-					String(Story.profile(story_species).get("nickname", "")), line)
+					String(Story.profile(story_species).get("nickname", "")), line, true)
 		"chapter":
 			# 停在中间章节：既画得出章名，也让进度条那行「累计接待 x/y · 店铺 m/n 星」有非零数字
 			gm.chapter = 5

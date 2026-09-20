@@ -47,6 +47,8 @@ const PANEL_Z := 950
 const STORY_HEIGHT := 128.0
 ## 排队上限：客人一批涌进来时宁可少说两句，也不让对白卡变成挡操作的一堵墙
 const STORY_QUEUE_MAX := 3
+## 自动开口的那一句（进店主客、离店道别、章节推进）到点自己收：玩家的手是拿来经营的
+const STORY_AUTO_SECONDS := 8.0
 const BUBBLE_SECONDS := 3.6
 ## 气泡相对客人脚边的头顶偏移：挂 HUD 之后每帧按这个贴一次
 const BUBBLE_OFFSET := Vector2(-70, -104)
@@ -128,6 +130,9 @@ var story_speaker: Label
 var story_body: Label
 var story_queue: Array[Dictionary] = []
 var story_showing := false
+## 这一句是系统自己开的口（true）还是玩家点出来的（false）：只有后者才把点空白算成翻页
+var story_auto := false
+var _story_left := 0.0
 var dock_mail: Button
 var mail_panel: Control
 var mail_scroll: ScrollContainer
@@ -297,6 +302,11 @@ func _process(delta: float) -> void:
 	if _bubble_left > 0.0:
 		_bubble_left -= delta
 		_sync_bubble()
+	# 自动开的那句到点自己走，玩家没点「继续」的义务；卡片被模态面板收起来时不许偷跑
+	if story_auto and story_card != null and story_card.visible:
+		_story_left -= delta
+		if _story_left <= 0.0:
+			_advance_line()
 	_update_review(delta)
 	_update_steam(delta)
 	_update_floats(delta)
@@ -881,24 +891,37 @@ func _build_story() -> void:
 	story_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(story_card)
 
-## 排队播一句：多段台词按段依次入队；队列已堆满就安静丢弃，剧情不许挡经营
-func _say(speaker: String, nickname: String, entry: Dictionary) -> bool:
+## 排队播一句：玩家主动点开的才放完整多段，系统自己开口的只给第一句。
+## 进屋七八秒里涌四五位客人，三段式会把对白卡堆成一堵挡操作的墙；
+## 完整那段改由玩家点他一下才展开，台词没废，只是不再是强行喂。
+## 队列已堆满就安静丢弃，返回值说的是「我这几句进队了没有」，
+## 调用方凭它决定要不要把这条记成已播——丢了的下次还得来。
+func _say(speaker: String, nickname: String, entry: Dictionary, full := false) -> bool:
 	if entry.is_empty():
 		return false
 	var who := speaker if nickname == "" else "%s · %s" % [speaker, nickname]
-	for seg: Variant in Story.segments(entry):
+	var segs: Array = Story.segments(entry)
+	if not full:
+		segs = segs.slice(0, 1)
+	var queued := 0
+	for seg: Variant in segs:
 		var text := String(seg).strip_edges()
 		if text == "" or story_queue.size() >= STORY_QUEUE_MAX:
 			continue
-		story_queue.append({"who": who, "text": text})
+		story_queue.append({"who": who, "text": text, "auto": not full})
+		queued += 1
+	if queued == 0:
+		return false
 	_show_line()
-	return story_showing or not story_queue.is_empty()
+	return true
 
 func _show_line() -> void:
 	if story_showing or story_queue.is_empty():
 		return
 	var line: Dictionary = story_queue.pop_front()
 	story_showing = true
+	story_auto = bool(line.get("auto", false))
+	_story_left = STORY_AUTO_SECONDS if story_auto else 0.0
 	story_speaker.text = String(line.who)
 	story_body.text = String(line.text)
 	_sync_story_card()
@@ -908,6 +931,8 @@ func _advance_line() -> void:
 	if not story_showing:
 		return
 	story_showing = false
+	story_auto = false
+	_story_left = 0.0
 	_sync_story_card()
 	_show_line()
 	_sync_bottom_stack()
@@ -1005,6 +1030,12 @@ func _on_guest_leaving(g: Guest) -> void:
 
 ## 点击客人：闲聊。带风向的闲聊当场生效，不必等成信
 func _on_guest_chat(g: Guest) -> void:
+	# 进屋那句只给了个头：玩家点他就是想知道这位是谁，那完整的自我介绍该由这一下换出来
+	if not g.pending_intro.is_empty():
+		var intro: Dictionary = g.pending_intro
+		g.pending_intro = {}
+		_say(g.guest_name, _nickname(g.species), intro, true)
+		return
 	var ctx := GameManager.story_ctx(g.species, g.affinity)
 	var line := GameManager.pick_line("chat", g.species, ctx)
 	if line.is_empty():
@@ -1012,7 +1043,7 @@ func _on_guest_chat(g: Guest) -> void:
 		_toast("%s 没抬头，只往池子里挪了挪。" % g.guest_name)
 		return
 	GameManager.apply_hint(line.get("hint", {}), float(_profile_of(g.species).get("confidence", 0.8)))
-	_say(g.guest_name, _nickname(g.species), line)
+	_say(g.guest_name, _nickname(g.species), line, true)
 
 ## 命中客人：脚边那一圈不算，身子中段才算——泡着的人只露出一颗头
 func _guest_at(pos: Vector2) -> Guest:
@@ -1048,7 +1079,7 @@ func _on_prop_tap(fid: String) -> void:
 		_toast("%s 安安静静的，什么也没说。" % prop_name)
 		return
 	GameManager.apply_hint(line.get("hint", {}))
-	_say(prop_name, "", line)
+	_say(prop_name, "", line, true)
 
 ## ---------------- 信箱 ----------------
 
@@ -1321,8 +1352,14 @@ func _try_spawn() -> void:
 	if not bool(mem.seen_intro):
 		var ctx := GameManager.story_ctx(species_id, guest.affinity)
 		var intro := GameManager.pick_line("intro", species_id, ctx)
-		GameManager.mark_intro_seen(species_id)
-		_say(guest.guest_name, _nickname(species_id), intro)
+		if not intro.is_empty():
+			# 首句挂到卡片上，剩下的挂在这只客人身上：点他这一下才把整段介绍放完
+			guest.pending_intro = intro
+			if _say(guest.guest_name, _nickname(species_id), intro):
+				# 进队播出去了才记「已介绍过」：被队列顶掉的那次不许偷记，否则这段台词凭空没了
+				GameManager.mark_intro_seen(species_id)
+				var segs: Array = Story.segments(intro)
+				guest.pending_intro = {"segments": segs.slice(1)} if segs.size() > 1 else {}
 	if GameManager.note_species(species_id):
 		_toast("图鉴新增：%s" % String(GameData.species(species_id).name))
 	_update_hud()
@@ -1464,9 +1501,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if mail_panel != null and mail_panel.visible:
 		return
-	# 对白卡占着底部时，点哪儿都算翻页：手机上那颗「继续」按钮离拇指太远。
-	# 但手里有货或在拆东西时不作数——那一下是玩家对准地面块的，凭什么被读成翻页
-	if story_showing and build_id == "" and not demolish_mode \
+	# 玩家自己点开的那种多段卡，点哪儿都算翻页：手机上那颗「继续」按钮离拇指太远。
+	# 系统自动开口的台词不作数——那一句会自己走，凭什么叫停玩家对准客人的那一下
+	if story_showing and not story_auto and build_id == "" and not demolish_mode \
 			and event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		_advance_line()
 		get_viewport().set_input_as_handled()

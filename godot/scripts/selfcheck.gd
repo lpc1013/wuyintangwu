@@ -142,6 +142,38 @@ func _run_checks() -> int:
 				failures += 1
 			else:
 				print("OK floats: capped=", cap)
+		# 谁开的口决定给多少：系统自己开口只播首句预告，玩家点出来的才放完整多段
+		if room_id == "indoor":
+			var before_fail_say := failures
+			var seg3 := {"segments": ["首句", "次句", "末句"]}
+			var queue: Array = room.get("story_queue")
+			queue.clear()
+			room.set("story_showing", false)
+			room.set("story_auto", false)
+			if not bool(room.call("_say", "甲", "", seg3)) or not bool(room.get("story_auto")) \
+					or not queue.is_empty() or String(room.get("story_body").text) != "首句":
+				printerr("FAIL 自动台词没收成一句预告: auto=", room.get("story_auto"),
+						" queue=", queue.size(), " body=", room.get("story_body").text)
+				failures += 1
+			room.call("_advance_line")
+			if not bool(room.call("_say", "甲", "", seg3, true)) or bool(room.get("story_auto")) \
+					or queue.size() != 2:
+				printerr("FAIL 玩家点开的多段台词没排完整: auto=", room.get("story_auto"),
+						" queue=", queue.size())
+				failures += 1
+			# 队列堆满时不许谎报播出去了：自我介绍的「已播」标记就挂在这个返回值上
+			room.set("story_showing", true)
+			queue.clear()
+			queue.resize(room.STORY_QUEUE_MAX)
+			if bool(room.call("_say", "甲", "", seg3)):
+				printerr("FAIL 队列满了还说这句进队了")
+				failures += 1
+			queue.clear()
+			room.set("story_showing", false)
+			room.set("story_auto", false)
+			room.call("_sync_story_card")
+			if failures == before_fail_say:
+				print("OK say: 自动只播首句，点开的才放完整多段，队列满了如实报没播")
 		# 对白卡不许压在模态面板上：跨天正好推进章节时，两者会同屏抢底部那块地
 		if room_id == "indoor":
 			var before_fail := failures

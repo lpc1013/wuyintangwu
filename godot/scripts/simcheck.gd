@@ -51,6 +51,7 @@ var reviews_prev := 0
 ## 借位造封顶样本时存下的原值；负数表示这一场还没借过
 var rep_pinned := -1.0
 var visits_untracked := 0
+var intro_expanded := false
 var chat_logged := false
 var chat_card_shown := false
 var chat_card_cleared := false
@@ -108,6 +109,11 @@ func _process(_delta: float) -> bool:
 	if frame >= STORY_FRAME and frame % 24 == 0 and not _story_done() \
 			and current_scene.has_method("_on_guest_chat"):
 		_drive_story(gm)
+	# 补全介绍这一段不等 _story_done：它要的是「身上还挂着没播完的介绍」那种客人，
+	# 而那种人只在陆续进屋的路上才有
+	if not intro_expanded and frame >= STORY_FRAME and frame % 24 == 0 \
+			and current_scene.has_method("_on_guest_chat"):
+		_drive_intro()
 	if not saw_bubble:
 		# 气泡整层挪到 HUD 之后不再挂在客人身上，只能问那一层现在贴着谁
 		saw_bubble = current_scene.get("bubble_label") != null
@@ -236,10 +242,32 @@ func _drive_story(gm: Node) -> void:
 func _story_done() -> bool:
 	return chat_logged and chat_card_shown and chat_card_cleared and prop_read and mail_closed
 
+## 进屋那句只播了个头的客人：点他这一下换出来的必须是那段介绍的下一句，
+## 不是另抽一句闲聊——「自动只播预告、点开才完整」这条规矩就靠这一拍钉住
+func _drive_intro() -> void:
+	for g: Node2D in get_nodes_in_group("guests"):
+		if g.position.y - 36.0 <= 60.0:
+			continue
+		var pend: Dictionary = g.pending_intro
+		if pend.is_empty():
+			continue
+		var segs: Array = Story.segments(pend)
+		if segs.is_empty():
+			continue
+		var want := String(segs[0]).strip_edges()
+		_clear_lines()
+		_click(g.position + Vector2(0, -36))
+		intro_expanded = bool(current_scene.story_showing) \
+				and String(current_scene.story_body.text) == want and g.pending_intro.is_empty()
+		return
+
 func _drive_chat(gm: Node) -> void:
 	for g: Node2D in get_nodes_in_group("guests"):
 		# 头点太靠上的那几位会被顶栏吃掉，点击根本到不了房间
 		if g.position.y - 36.0 <= 60.0:
+			continue
+		# 还挂着没播完的介绍的那位让给 _drive_intro：点他出的是介绍词，不是闲聊
+		if not g.pending_intro.is_empty():
 			continue
 		var before := int(gm.story_log.size())
 		_click(g.position + Vector2(0, -36))
@@ -377,7 +405,9 @@ func _report(gm: Node) -> bool:
 		pool_cap = int(current_scene.pools[0].cap)
 	for sp: String in gm.codex:
 		var m: Dictionary = gm.memory.get(sp, {})
-		if int(m.get("visits", 0)) <= 0 or not bool(m.get("seen_intro", false)):
+		# 只盯来访数：seen_intro 允许是 false——介绍被队列顶掉时不记已播，下次来访重来，
+		# 这是「台词不许凭空蒸发」的代价，不是漏账
+		if int(m.get("visits", 0)) <= 0:
 			visits_untracked += 1
 	print("SIM coins=", gm.coins, " stay=", saw_stay, " leave=", saw_leave,
 		" peak_alive=", peak_alive, " alive_now=", get_nodes_in_group("guests").size())
@@ -392,7 +422,7 @@ func _report(gm: Node) -> bool:
 		" pool_cap=", pool_cap, " hot_quota=", gm.budget_for_type("hot"),
 		" unlocked=", gm.unlocked_count(), "/", gm.room_count())
 	print("SIM story chat=", chat_logged, "/", chat_card_shown, "/", chat_card_cleared,
-		" bubble=", saw_bubble, " prop=", prop_read,
+		" intro=", intro_expanded, " bubble=", saw_bubble, " prop=", prop_read,
 		" mail=", mail_panel_opened, "/", mail_read, "/", mail_forecast, "/", mail_closed,
 		" float=", saw_income_float, "/", saw_cost_float, " steam=", saw_steam, " review=", saw_review,
 		" untracked=", visits_untracked, " chapter=", gm.chapter + 1,
@@ -415,6 +445,7 @@ func _report(gm: Node) -> bool:
 		"结算分池账本自洽": ledger_consistent,
 		"扩建后池位变多": upgraded and pool_cap == 5,
 		"声望解锁更多房间": gm.unlocked_count() > 2,
+		"点开生客补全自我介绍": intro_expanded,
 		"点客人闲聊出词": chat_logged,
 		"闲聊弹出对白卡": chat_card_shown,
 		"点空白翻过页": chat_card_cleared,
