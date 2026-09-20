@@ -50,13 +50,16 @@ const STORY_QUEUE_MAX := 3
 ## 自动开口的那一句（进店主客、离店道别、章节推进）到点自己收：玩家的手是拿来经营的
 const STORY_AUTO_SECONDS := 8.0
 const BUBBLE_SECONDS := 3.6
-## 气泡相对客人脚边的头顶偏移：挂 HUD 之后每帧按这个贴一次
-const BUBBLE_OFFSET := Vector2(-70, -104)
+## 气泡相对客人头顶的偏移：牌子挂在左肩上方。文字框 40 高、字贴底排，
+## -46 就是让最后一行的下沿离头顶留 6 像素
+const BUBBLE_OFFSET := Vector2(-70, -46)
 ## 手指点客人的命中半径：精灵只有 32~38 宽，按脚边算会点十次中不了三次
 const GUEST_TAP_RADIUS := 44.0
 ## 金币飘字：HUD 那个数字跳一下，玩家看不出钱是谁给的、这笔又花在了哪
 const FLOAT_SECONDS := 1.15
 const FLOAT_RISE := 36.0
+## 飘字按 Label 的顶边落点，13 号字连描边约这么高；要从头顶往上飘就得先把它让开
+const FLOAT_LABEL_H := 20.0
 ## 八位客人同时泡汤时进账很密，飘字叠成一片就没人看得清了
 const FLOAT_MAX := 7
 const INCOME_TINT := Color(1.0, 0.87, 0.42)
@@ -160,7 +163,7 @@ var _review_left := 0.0
 var hud: CanvasLayer
 ## 气泡挪到 HUD 后不再天然跟着客人走，只能每帧按宿主位置换算一次
 var bubble_label: Label
-var bubble_host: Node2D
+var bubble_host: Guest
 
 func _ready() -> void:
 	cfg = GameManager.ROOMS.get(GameManager.current_room, {})
@@ -952,7 +955,7 @@ func _modal_up() -> bool:
 			or (mail_panel != null and mail_panel.visible)
 
 ## 头顶气泡：自言自语与踩雷抱怨是环境音，不值得占掉整块对白卡
-func _bubble(g: Node2D, text: String, glow := false) -> void:
+func _bubble(g: Guest, text: String, glow := false) -> void:
 	if text == "" or _bubble_left > 0.0 or (story_card != null and story_card.visible):
 		return
 	_bubble_left = BUBBLE_SECONDS
@@ -988,7 +991,8 @@ func _bubble(g: Node2D, text: String, glow := false) -> void:
 func _sync_bubble() -> void:
 	if bubble_label == null or bubble_host == null or not is_instance_valid(bubble_host):
 		return
-	bubble_label.position = bubble_host.position + BUBBLE_OFFSET
+	bubble_label.position = bubble_host.position + Vector2(BUBBLE_OFFSET.x,
+			BUBBLE_OFFSET.y + bubble_host.head_y())
 
 static func _flat(entry: Dictionary) -> String:
 	var parts: Array[String] = []
@@ -1052,12 +1056,14 @@ func _guest_at(pos: Vector2) -> Guest:
 	var best: Guest = null
 	var best_d := GUEST_TAP_RADIUS
 	for g: Node2D in guests:
-		if not is_instance_valid(g):
+		var gu := g as Guest
+		if gu == null:
 			continue
-		var d: float = (g.position + Vector2(0, -36)).distance_to(pos)
+		# 命中点取身子中段：泡着只露一颗头的、站着整只的，各量各的
+		var d: float = (gu.position + Vector2(0, gu.head_y() * 0.5)).distance_to(pos)
 		if d <= best_d:
 			best_d = d
-			best = g as Guest
+			best = gu
 	return best
 
 ## 命中设施：容差与判定矩形跟拆除共用一套，
@@ -1465,7 +1471,8 @@ func _random_yukata() -> Color:
 
 func _on_coin(amount: int, guest: Guest) -> void:
 	GameManager.coins += amount
-	_float_text(guest.position + Vector2(0, -58), "+%d" % amount, INCOME_TINT)
+	_float_text(guest.position + Vector2(0, guest.head_y() - FLOAT_LABEL_H),
+			"+%d" % amount, INCOME_TINT)
 	_update_hud()
 
 func _on_reviewed(guest: Guest, stars: int, wish_id: String, wish_done: bool) -> void:

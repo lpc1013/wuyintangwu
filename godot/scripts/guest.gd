@@ -362,12 +362,16 @@ func _spawn_emote() -> void:
 	tween.parallel().tween_property(emote, "modulate:a", 0.0, 0.7)
 	tween.tween_callback(emote.queue_free)
 
-## 当前姿态的墨迹上沿，换算到客人自己的坐标系
-func _emote_anchor() -> float:
+## 当前姿态的墨迹上沿，换算到客人自己的坐标系。
+## 心心、气泡、金币飘字与点击判定都要落在「这颗头」上，
+## 而画布统一 96 行、各物种头顶高度差出一倍，只能每张现量
+func head_y() -> float:
 	var tex := sprite.texture
 	var ink_row := float(tex.get_image().get_used_rect().position.y)
-	var ink_top := sprite.offset.y + (ink_row - tex.get_height() * 0.5) * sprite.scale.y
-	return ink_top - EMOTE_CLEAR
+	return sprite.offset.y + (ink_row - tex.get_height() * 0.5) * sprite.scale.y
+
+func _emote_anchor() -> float:
+	return head_y() - EMOTE_CLEAR
 
 func _depart() -> void:
 	reviewed.emit(self, star_rating(), wish_id, wish_done)
