@@ -130,6 +130,7 @@ static func _tex(sp: String, yk: Color, pose: String) -> Texture2D:
 
 ## 直接读文件而不是 load()：贴图不必经编辑器导入就能用，
 ## --script 跑自检时才不会因为 .godot/imported 缺席而全员退回程序化画法
+## 导出后原始 png 不在包里（被导入成 .ctex），这里补一条走资源系统的兜底
 static func _ai_tex(sp: String, pose: String) -> Texture2D:
 	var key := "ai|%s|%s" % [sp, pose]
 	if _tex_cache.has(key):
@@ -140,6 +141,11 @@ static func _ai_tex(sp: String, pose: String) -> Texture2D:
 		var img := Image.load_from_file(path)
 		if img != null:
 			tex = ImageTexture.create_from_image(img)
+	if tex == null:
+		# 导出版：png 只以导入后的纹理存在，FileAccess 拿不到原始字节
+		var res := ResourceLoader.load(path, "Texture2D")
+		if res is Texture2D:
+			tex = res
 	if tex == null:
 		# 没迁的物种整组都缺，记下来只会把名单冲成一片噪音；只报「已经吃了贴图却漏帧」的
 		if pose != "walk" and _ai_tex(sp, "walk") != null:
