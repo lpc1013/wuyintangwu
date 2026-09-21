@@ -30,7 +30,8 @@ const ROOMS := {
 		"pool_types": ["herb"],
 		"spawns": [Vector2(120, 492), Vector2(448, 500), Vector2(776, 492)],
 		# 洗漱凳排到了走廊边，只剩竹丛苔地一整块 + 右侧毛巾筐与木架之间一条石沿
-		"lots": [Rect2(0, 344, 96, 96), Rect2(800, 352, 96, 28)],
+		# （石沿 28 高只容得下手绘小件；抠图目录里最矮的盘子要 32，往下借 8 个像素）
+		"lots": [Rect2(0, 344, 96, 96), Rect2(800, 352, 96, 36)],
 		"map_anchor": Vector2(448, 235),
 		"lights": [Vector2(567, 50), Vector2(858, 141)],
 		"unlock_rep": 0,
@@ -335,7 +336,21 @@ func room_fits(room_id: String, id: String) -> bool:
 		return false
 	var size := Vector2(GameData.facility_size(id))
 	if bool(f.get("wall_only", false)):
-		return HUD_BOTTOM + size.y * 0.5 <= wall_limit_y(room_id)
+		# 墙带不只是高度：底边还得落在 16 格上、顶边不压 HUD、下缘不碰池沿——
+		# 少算一条，调色板就会把其实挂不上的件点亮着骗人点一次红一次
+		for by in range(16, int(VIEWPORT_SIZE.y) + 1, 16):
+			var top := float(by) - float(size.y)
+			var center_y := top + float(size.y) * 0.5
+			if top < HUD_BOTTOM or center_y > wall_limit_y(room_id):
+				continue
+			var rect := Rect2(64.0, top, float(size.x), float(size.y))
+			var hit_pool := false
+			for r: Rect2 in cfg.get("pools", []):
+				if rect.intersects(r.grow(-2.0)):
+					hit_pool = true
+			if not hit_pool:
+				return true
+		return false
 	for l: Rect2 in cfg.get("lots", []):
 		if l.size.x >= size.x and l.size.y >= size.y:
 			return true

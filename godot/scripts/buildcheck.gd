@@ -54,7 +54,7 @@ func _run() -> void:
 	var deck := _lot_spot(ROOM, "vender")
 	_falsy("池面不能放零食摊", gm.can_place(ROOM, "vender", _pool_center()))
 	_truthy("平台可以放零食摊", gm.can_place(ROOM, "vender", deck))
-	_truthy("落点吸附到 16 格底部中心", gm.snap_center("vender", Vector2(43.0, 371.0)) == Vector2(48.0, 374.0))
+	_truthy("落点吸附到 16 格底部中心", gm.snap_center("vender", Vector2(43.0, 371.0)) == Vector2(48.0, 368.0))
 	_falsy("地面块之外不能放", gm.can_place(ROOM, "vender", Vector2(400.0, 460.0)))
 	for room: String in gm.ROOMS.keys():
 		_truthy("%s 至少容得下一件设施" % room, _any_fits(room))
@@ -87,20 +87,21 @@ func _run() -> void:
 	_truthy("拆完空位可重建", gm.can_place(ROOM, "vender", deck))
 	_truthy("点空处不退款", gm.sell_facility(ROOM, Vector2(400.0, 120.0)) == 0)
 
-	# 2c. 拆除容差：手指点不准 60 宽的小件，边界外几个像素也得拆得中
+	# 2c. 拆除容差：手指点不准小件，边界外几个像素也得拆得中（偏移按件高一半+3 给）
 	gm.buy_facility(ROOM, "vender", deck)
-	var grazing := deck + Vector2(0, 29.0)
+	var grazing := deck + Vector2(0, float(GameData.facility_size("vender").y) * 0.5 + 3.0)
 	_truthy("零容差时边界外点不中", gm.sell_facility(ROOM, grazing) == 0)
 	_truthy("容差 8 时边界外点得中", gm.sell_facility(ROOM, grazing, 8.0) > 0)
 
-	# 3. 灯笼只能上墙，且限量
-	var hang := Vector2(200.0, gm.wall_limit_y(ROOM) - 24.0)
+	# 3. 灯笼只能上墙，且限量（墙带取到池沿上方为止；间距按新贴图宽 +8）
+	var hang := Vector2(200.0, gm.wall_limit_y(ROOM) - 54.0)
+	var step := float(GameData.facility_size("lantern").x) + 8.0
 	_falsy("灯笼不能放在平台", gm.can_place(ROOM, "lantern", deck))
 	_truthy("灯笼可以挂在墙带", gm.can_place(ROOM, "lantern", hang))
 	for i in LANTERN_MAX:
-		gm.buy_facility(ROOM, "lantern", Vector2(hang.x + float(i) * 36.0, hang.y))
+		gm.buy_facility(ROOM, "lantern", Vector2(hang.x + float(i) * step, hang.y))
 	_truthy("灯笼上限 %d 盏" % LANTERN_MAX, gm.facility_count(ROOM, "lantern") == LANTERN_MAX)
-	_falsy("再多一盏被拒绝", gm.can_place(ROOM, "lantern", Vector2(hang.x + 320.0, hang.y)))
+	_falsy("再多一盏被拒绝", gm.can_place(ROOM, "lantern", Vector2(hang.x + 8.0 * step, hang.y)))
 
 	# 4. 金币不足
 	gm.coins = 0
@@ -119,9 +120,11 @@ func _run() -> void:
 	# 6. 设施收益加成，且封顶 1.3
 	_reset()
 	_truthy("空房间无加成", gm.facility_bonus(ROOM) == 1.0)
-	var planted := _fill(ROOM, "plant", 20)
-	_truthy("地面块里塞下 %d 盆" % planted, planted >= 6)
-	_truthy("加成封顶 1.3", absf(gm.facility_bonus(ROOM) - 1.3) < 0.001)
+	# 盆栽换成了 64×88 的抠图，室内 96 见方的地只塞得下一盆；
+	# 封顶测试挪去石泉——那里有 300×110 与 250×110 两条长苔带，网格塞得满
+	var planted := _fill("ishiyu", "plant", 20)
+	_truthy("石泉苔地塞下 %d 盆" % planted, planted >= 6)
+	_truthy("加成封顶 1.3", absf(gm.facility_bonus("ishiyu") - 1.3) < 0.001)
 
 	# 7. 心愿门槛：零食心愿要零食摊
 	_reset()

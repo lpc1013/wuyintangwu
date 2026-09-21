@@ -592,9 +592,15 @@ static func steam_texture() -> ImageTexture:
 	_steam_cache = ImageTexture.create_from_image(im)
 	return _steam_cache
 
-static func facility_texture(id: String) -> ImageTexture:
+static func facility_texture(id: String) -> Texture2D:
 	if not _facility_cache.has(id):
-		_facility_cache[id] = ImageTexture.create_from_image(make_facility(id))
+		# 抠图目录里有同名贴图就用它——按 id 约定找文件，不引 GameData，
+		# 免得 headless --script 模式下静态函数碰自动加载直接崩
+		var path := "res://assets/items/item_%s.png" % id
+		if ResourceLoader.exists(path):
+			_facility_cache[id] = load(path)
+		else:
+			_facility_cache[id] = ImageTexture.create_from_image(make_facility(id))
 	return _facility_cache[id]
 
 static func make_facility(id: String) -> Image:

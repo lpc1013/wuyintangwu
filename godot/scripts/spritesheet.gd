@@ -52,7 +52,7 @@ func _run() -> void:
 	# 设施带：按 FACILITY_IDS 顺序横排
 	for i in fids.size():
 		var fid := String(fids[i])
-		var ftex := PixelArt.make_facility(fid)
+		var ftex := PixelArt.facility_texture(fid).get_image()
 		var fx := (i + 1) * CELL + (CELL - ftex.get_width() * SCALE) / 2
 		var fy := (rows + 1) * CELL + (CELL - ftex.get_height() * SCALE) / 2
 		_blit_scaled(img, ftex, fx, fy, SCALE)

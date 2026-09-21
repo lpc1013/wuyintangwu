@@ -9,10 +9,11 @@ const TARGET_ROOM := "ooike"
 ## 1500 帧 × time_scale 12 约合 14 个游戏小时，所以起始钟必须钉在 18:00
 ## 才能在预算内跨天一次、又不至于跨第二次。
 const LAST_FRAME := 1500
-const WISH_FACILITIES := ["camera", "vender", "bench"]
-## 触摸链路检查的时机与用件：盆栽便宜、非墙上件，地面块里好找落点
+const WISH_FACILITIES := ["camera", "vender"]
+## 触摸链路检查的时机与用件：木屐便宜、非墙上件，大池池沿的坐凳带里塞得下
+## （盆栽换成了 64×88 的抠图，大池那几条 56 高的窄带容不下，换小件来验点击链路）
 const TOUCH_FRAME := 40
-const TOUCH_ID := "plant"
+const TOUCH_ID := "geta"
 ## 叙事链路检查的时机：此时屋里已有好几位客人，家具也摆齐了
 const STORY_FRAME := 240
 ## 合成信里带的风向池子：实机留信要等五成骰子，检查不能压在运气上
@@ -173,6 +174,16 @@ func _furnish(gm: Node) -> int:
 
 func _place_one(gm: Node, id: String) -> bool:
 	var size := Vector2(GameData.facility_size(id))
+	if bool(GameData.facility(id).get("wall_only", false)):
+		# 墙上件没有地面块可依：沿 16 格把墙带扫一遍，找第一条不碰池沿的横线
+		for by in range(16, int(gm.VIEWPORT_SIZE.y) + 1, 16):
+			var top := float(by) - float(size.y)
+			if top < gm.HUD_BOTTOM or top + float(size.y) * 0.5 > gm.wall_limit_y(TARGET_ROOM):
+				continue
+			for cx in range(32, int(gm.VIEWPORT_SIZE.x) - 32, 16):
+				if gm.buy_facility(TARGET_ROOM, id, Vector2(float(cx), top + float(size.y) * 0.5)):
+					return true
+		return false
 	var lots: Array = gm.room_cfg(TARGET_ROOM).lots
 	for i in lots.size():
 		var l: Rect2 = lots[i]

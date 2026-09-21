@@ -218,23 +218,88 @@ const POOLS := {
 
 ## 设施：w/h 为精灵画布像素（显示时统一按 DISPLAY_SCALE 放大）
 ## wall_only 只能挂在墙带上；max_count 限制单间数量；snack/photo/nap 为心愿供给标记
+## 目录里的每一件都在 res://assets/items/item_<id>.png 有一张从场景底图抠出的贴图：
+## w/h 就是贴图的一半（贴图自带 2px 方块，与背景、动物同格），PixelArt.facility_texture 优先加载它们。
 const FACILITIES := {
-	"lantern": {"name": "纸灯笼", "cost": 30, "w": 16, "h": 20, "wall_only": true, "max_count": 8,
+	"lantern": {"name": "纸灯笼", "cost": 30, "w": 32, "h": 39, "wall_only": true, "max_count": 8,
 		"eff": {"joy": 1, "fame": 1}, "desc": "只能挂在墙上的暖光灯笼。"},
-	"bench": {"name": "木长椅", "cost": 40, "w": 28, "h": 14, "nap": true,
+	"bench": {"name": "木长椅", "cost": 40, "w": 52, "h": 60, "nap": true,
 		"eff": {"relax": 1, "joy": 1}, "desc": "客人等位时坐一坐。"},
-	"vender": {"name": "零食摊", "cost": 90, "w": 30, "h": 26, "snack": true,
-		"eff": {"coin": 1, "joy": 2}, "desc": "想吃零食的客人会来这儿。"},
-	"camera": {"name": "拍照角", "cost": 70, "w": 20, "h": 20, "photo": true,
-		"eff": {"fame": 1, "joy": 1}, "desc": "想拍照的客人在此留影。"},
-	"plant": {"name": "盆栽景", "cost": 35, "w": 16, "h": 20,
+	"vender": {"name": "零食摊", "cost": 90, "w": 28, "h": 16, "snack": true,
+		"eff": {"coin": 1, "joy": 2}, "desc": "端出和果子的待客木盘，想吃零食的客人会来这儿。"},
+	"camera": {"name": "拍照角", "cost": 70, "w": 17, "h": 20, "wall_only": true, "photo": true,
+		"eff": {"fame": 1, "joy": 1}, "desc": "挂一幅富士小画，想拍照的客人在此留影。"},
+	"plant": {"name": "盆栽景", "cost": 35, "w": 32, "h": 44,
 		"eff": {"relax": 1}, "desc": "增添绿意，安静治愈。"},
-	"bucket": {"name": "木桶架", "cost": 45, "w": 18, "h": 20,
+	"bucket": {"name": "木桶架", "cost": 45, "w": 42, "h": 45,
 		"eff": {"relax": 1, "joy": 1}, "desc": "备用的杉木桶，散发着木香。"},
-	"tea": {"name": "茶点桌", "cost": 60, "w": 26, "h": 14, "nap": true,
+	"tea": {"name": "茶点桌", "cost": 60, "w": 50, "h": 37, "nap": true,
 		"eff": {"joy": 1, "social": 1}, "desc": "麦茶与团子，自助取用。"},
+	# ---- 以下 29 件：从六个场景底图里抠出来的原物，摆回哪儿都像长在那儿 ----
+	"andon_hang": {"name": "吊行灯", "cost": 45, "w": 32, "h": 69, "wall_only": true,
+		"eff": {"joy": 1}, "desc": "从房梁垂下一盏暖黄的吊灯。"},
+	"kakejiku": {"name": "山水挂轴", "cost": 80, "w": 30, "h": 73, "wall_only": true,
+		"eff": {"fame": 1, "relax": 1}, "desc": "一纸远山近树，茶室的门面。"},
+	"kouro": {"name": "五德香炉", "cost": 65, "w": 33, "h": 35,
+		"eff": {"relax": 2, "fame": 1}, "desc": "一缕沉水香，浮躁的人坐得住。"},
+	"andon_floor": {"name": "落地行灯", "cost": 35, "w": 22, "h": 22,
+		"eff": {"joy": 1}, "desc": "矮矮一盏木框灯，夜里自己会亮。"},
+	"tetsubin": {"name": "铁急须", "cost": 50, "w": 31, "h": 29,
+		"eff": {"joy": 1}, "desc": "黑铁壶烧着滚水，提梁上还挂着热气。"},
+	"chawan": {"name": "茶碗", "cost": 15, "w": 16, "h": 19,
+		"eff": {"relax": 1}, "desc": "粗陶小碗，盛半盏麦茶。"},
+	"clay_teapot": {"name": "陶壶", "cost": 40, "w": 30, "h": 26,
+		"eff": {"joy": 1}, "desc": "紫砂矮壶，壶嘴微微上翘。"},
+	"bowls_stack": {"name": "茶碗摞", "cost": 30, "w": 31, "h": 30,
+		"eff": {}, "desc": "叠了四五只的米白瓷碗，等着被取走一只。"},
+	"basket": {"name": "竹篓", "cost": 25, "w": 33, "h": 27,
+		"eff": {}, "desc": "空着的竹编收纳篓，什么都往里扔。"},
+	"cushion": {"name": "坐垫", "cost": 20, "w": 55, "h": 34, "nap": true,
+		"eff": {"relax": 1}, "desc": "橙格纹的软垫，坐下去就不想起来。"},
+	"clock": {"name": "挂钟", "cost": 40, "w": 17, "h": 17, "wall_only": true,
+		"eff": {"effcy": 1}, "desc": "滴答滴答，提醒师傅汤还没烧好。"},
+	"noren": {"name": "暖帘", "cost": 50, "w": 67, "h": 43, "wall_only": true,
+		"eff": {"fame": 1}, "desc": "印着汤气的蓝布帘，行家一看就知道有热水。"},
+	"signboard": {"name": "木告示牌", "cost": 30, "w": 25, "h": 47,
+		"eff": {}, "desc": "今日汤温与注意事项，字是手写歪的。"},
+	"spout": {"name": "竹笕流水", "cost": 90, "w": 70, "h": 65,
+		"eff": {"joy": 1, "relax": 1}, "desc": "竹笕引活水，哗哗响着就不冷清。"},
+	"washstand": {"name": "洗漱台", "cost": 55, "w": 37, "h": 55,
+		"eff": {"relax": 1}, "desc": "木盆搁在矮架上，盆里接了半盆清水。"},
+	"shampoo": {"name": "洗发液瓶", "cost": 15, "w": 12, "h": 32,
+		"eff": {}, "desc": "按压头的透明瓶，泡完头发香香的。"},
+	"towel_stack": {"name": "毛巾摞", "cost": 20, "w": 35, "h": 30,
+		"eff": {}, "desc": "叠得方方正正的白毛巾，舍不得用。"},
+	"towel_basket": {"name": "毛巾筐", "cost": 35, "w": 27, "h": 27,
+		"eff": {"relax": 1}, "desc": "藤筐里卷成筒的毛巾，抽一条就走。"},
+	"ishidoro": {"name": "石灯笼", "cost": 100, "w": 29, "h": 53,
+		"eff": {"joy": 1, "fame": 1}, "desc": "苔痕斑斑的石灯，点亮就是庭院的主角。"},
+	"azalea": {"name": "杜鹃花丛", "cost": 60, "w": 77, "h": 50,
+		"eff": {"joy": 1}, "desc": "五月开得最盛的那一丛，蜜蜂也认路。"},
+	"oke_lid": {"name": "杉木盖桶", "cost": 50, "w": 47, "h": 46,
+		"eff": {}, "desc": "带木盖的大桶，盖子上还凹着提手位。"},
+	"mat": {"name": "草席", "cost": 40, "w": 76, "h": 42,
+		"eff": {"relax": 1}, "desc": "编得密密的稻草席，赤脚踩上去刚刚好。"},
+	"geta": {"name": "木屐", "cost": 15, "w": 35, "h": 22,
+		"eff": {}, "desc": "一双脱在门口的木屐，带子是红的。"},
+	"stool_towel": {"name": "汤台小凳", "cost": 30, "w": 35, "h": 35,
+		"eff": {}, "desc": "小木凳上搁着叠好的擦身巾。"},
+	"ladder": {"name": "泳池扶梯", "cost": 45, "w": 22, "h": 37,
+		"eff": {"effcy": 1}, "desc": "大池标配的不锈钢扶梯，下水体面。"},
+	"palm_potted": {"name": "盆栽苏铁", "cost": 40, "w": 35, "h": 84,
+		"eff": {"relax": 1}, "desc": "陶盆里一蓬羽状叶，浴场也要有热带梦。"},
+	"kake_bacho": {"name": "挂桶壶", "cost": 30, "w": 22, "h": 32,
+		"eff": {}, "desc": "带梁的铁皮桶，打热水一手提溜。"},
+	"andon_snow": {"name": "雪见行灯", "cost": 45, "w": 32, "h": 36,
+		"eff": {"joy": 1}, "desc": "灯顶堆着一晚的雪，光反而更暖。"},
+	"fence": {"name": "木栅栏", "cost": 55, "w": 75, "h": 25,
+		"eff": {}, "desc": "矮矮一道横栏，把枯山水圈得更有样子。"},
 }
-const FACILITY_IDS := ["lantern", "bench", "vender", "camera", "plant", "bucket", "tea"]
+const FACILITY_IDS := ["lantern", "bench", "vender", "camera", "plant", "bucket", "tea",
+	"andon_hang", "kakejiku", "kouro", "andon_floor", "tetsubin", "chawan", "clay_teapot",
+	"bowls_stack", "basket", "cushion", "clock", "noren", "signboard", "spout", "washstand",
+	"shampoo", "towel_stack", "towel_basket", "ishidoro", "azalea", "oke_lid", "mat",
+	"geta", "stool_towel", "ladder", "palm_potted", "kake_bacho", "andon_snow", "fence"]
 const DISPLAY_SCALE := 2
 
 ## 席位扩建：每升一级多一个位、在席收益与单日投币额度同步放大
@@ -293,6 +358,11 @@ static func pool_steam(type_id: String) -> float:
 
 static func facility(id: String) -> Dictionary:
 	return FACILITIES.get(id, {})
+
+## 抠图目录里有同名贴图：这类贴图自带 2px 方块、本身就是屏幕像素，
+## 摆放与幽灵预览都按 1x 画；只有程序化小件才吃 DISPLAY_SCALE。
+static func has_item_tex(id: String) -> bool:
+	return ResourceLoader.exists("res://assets/items/item_%s.png" % id)
 
 ## 设施占地（已按显示倍率放大），供落点校验与幽灵预览共用
 static func facility_size(id: String) -> Vector2i:

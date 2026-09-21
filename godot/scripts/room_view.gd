@@ -613,7 +613,7 @@ func _build_facilities() -> void:
 func _add_facility_node(id: String, pos: Vector2) -> void:
 	var sp := Sprite2D.new()
 	sp.texture = PixelArt.facility_texture(id)
-	var s := float(GameData.DISPLAY_SCALE)
+	var s := 1.0 if GameData.has_item_tex(id) else float(GameData.DISPLAY_SCALE)
 	sp.scale = Vector2(s, s)
 	sp.position = pos
 	sp.z_index = int(pos.y)
@@ -628,9 +628,13 @@ func _build_palette() -> void:
 	palette.z_index = PANEL_Z
 	palette.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	palette.offset_top = -PALETTE_HEIGHT
+	# 三十六件塞不进一屏：横向滚动，手指/滚轮拖着挑
+	var scroller := ScrollContainer.new()
+	scroller.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	palette.add_child(scroller)
 	var box := HBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	palette.add_child(box)
+	scroller.add_child(box)
 	for id: String in GameData.FACILITY_IDS:
 		var f: Dictionary = GameData.facility(id)
 		var b := Button.new()
@@ -706,7 +710,7 @@ func _select_build(id: String) -> void:
 		ghost.z_index = 900
 		add_child(ghost)
 	ghost.texture = PixelArt.facility_texture(id)
-	var s := float(GameData.DISPLAY_SCALE)
+	var s := 1.0 if GameData.has_item_tex(id) else float(GameData.DISPLAY_SCALE)
 	ghost.scale = Vector2(s, s)
 	ghost.visible = true
 	palette.visible = false
