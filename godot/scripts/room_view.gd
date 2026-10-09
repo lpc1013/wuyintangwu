@@ -44,7 +44,7 @@ const PANEL_Z := 950
 ## 对白卡：说话人 + 正文（最多两行）+ 继续键，触摸端整块可点
 ## 128 = 说话人 20 + 正文最低 40 + 触摸键 40 + 两条 4 的间距 + 上下 10 的内边距。
 ## 比内容还矮的话 PanelContainer 会撑着自己的最小尺寸往下长，「继续」键就被挤出画面。
-const STORY_HEIGHT := 128.0
+const STORY_HEIGHT := 148.0
 ## 排队上限：客人一批涌进来时宁可少说两句，也不让对白卡变成挡操作的一堵墙
 const STORY_QUEUE_MAX := 3
 ## 自动开口的那一句（进店主客、离店道别、章节推进）到点自己收：玩家的手是拿来经营的
@@ -52,7 +52,7 @@ const STORY_AUTO_SECONDS := 8.0
 const BUBBLE_SECONDS := 3.6
 ## 气泡相对客人头顶的偏移：牌子挂在左肩上方。文字框 40 高、字贴底排，
 ## -46 就是让最后一行的下沿离头顶留 6 像素
-const BUBBLE_OFFSET := Vector2(-70, -46)
+const BUBBLE_OFFSET := Vector2(-120, -70)
 ## 手指点客人的命中半径：精灵只有 32~38 宽，按脚边算会点十次中不了三次
 const GUEST_TAP_RADIUS := 44.0
 ## 金币飘字：HUD 那个数字跳一下，玩家看不出钱是谁给的、这笔又花在了哪
@@ -84,7 +84,7 @@ const REVIEW_SECONDS := 3.4
 ## 顶栏下方留这一截再起条：位置由顶栏实际高度推出来，别写死——
 ## 写死的话谁把顶栏加高一点，这条带就无声滑到顶栏底下去了
 const REVIEW_GAP := 6.0
-const REVIEW_HEIGHT := 22.0
+const REVIEW_HEIGHT := 26.0
 ## 底衬比字各留一点呼吸，紧贴字边的方框很寒碜
 const REVIEW_PLATE_PAD := 10.0
 ## 与顶栏那块板子同色同透明度：一条带是设计，两条带颜色不同就是没对齐
@@ -194,7 +194,8 @@ func _ready() -> void:
 	_build_dock()
 	for label: Label in [%RoomLabel, %CoinsLabel, %ClockLabel, %StarsLabel, %Toast]:
 		label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82, 1.0))
-		label.add_theme_font_size_override("font_size", 14)
+		# 顶栏是唯一挤不回 896 的一排：16 比正文小两号，但仍比放大前的 14 大一档
+		label.add_theme_font_size_override("font_size", 16)
 	%Toast.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	_update_hud()
 
@@ -291,7 +292,10 @@ func _process(delta: float) -> void:
 	if not GameManager.pending_surprise.is_empty():
 		var surprise: Dictionary = GameManager.pending_surprise
 		GameManager.pending_surprise = {}
-		_say("店内杂记", "", surprise)
+		# 杂记是店里的事，不是谁在说话：一行飘过就行，别占住底部那条横带
+		var segs: Array = Story.segments(surprise)
+		if not segs.is_empty():
+			_toast(String(segs[0]).strip_edges())
 	spawn_acc += delta
 	if spawn_acc >= SPAWN_INTERVAL:
 		spawn_acc = 0.0
@@ -322,7 +326,7 @@ func _float_text(pos: Vector2, text: String, tint: Color) -> void:
 		(oldest.node as Label).queue_free()
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_font_size_override("font_size", 16)
 	l.add_theme_color_override("font_color", tint)
 	l.add_theme_color_override("font_outline_color", Color(0.12, 0.07, 0.16, 0.92))
 	l.add_theme_constant_override("outline_size", 4)
@@ -357,7 +361,7 @@ func _build_review() -> void:
 	review_line.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	## 挂上去但不接点击：那条带正压在客人入场路上，接了会把人挡住
 	review_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	review_line.add_theme_font_size_override("font_size", 14)
+	review_line.add_theme_font_size_override("font_size", 18)
 	review_line.add_theme_constant_override("outline_size", 5)
 	review_line.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.92))
 	review_line.visible = false
@@ -639,6 +643,9 @@ func _build_palette() -> void:
 		var f: Dictionary = GameData.facility(id)
 		var b := Button.new()
 		b.text = "%s %d" % [String(f.name), int(f.cost)]
+		# 三十六件光看名字认不出，缩略图按块折半所以仍是硬边像素
+		b.icon = PixelArt.facility_preview_texture(id)
+		b.add_theme_constant_override("icon_max_width", 40)
 		GameManager.style_button(b)
 		b.pressed.connect(_select_build.bind(id))
 		box.add_child(b)
@@ -782,9 +789,9 @@ func _build_expand() -> void:
 		var info := Label.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82, 1.0))
-		info.add_theme_font_size_override("font_size", 14)
+		info.add_theme_font_size_override("font_size", 18)
 		var btn := Button.new()
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_font_size_override("font_size", 18)
 		GameManager.style_button(btn)
 		btn.pressed.connect(_on_upgrade.bind(pi))
 		row.add_child(info)
@@ -876,13 +883,13 @@ func _build_story() -> void:
 	box.add_theme_constant_override("separation", 4)
 	story_card.add_child(box)
 	story_speaker = Label.new()
-	story_speaker.add_theme_font_size_override("font_size", 14)
+	story_speaker.add_theme_font_size_override("font_size", 18)
 	story_speaker.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	box.add_child(story_speaker)
 	story_body = Label.new()
 	story_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	story_body.custom_minimum_size = Vector2(0, 40)
-	story_body.add_theme_font_size_override("font_size", 16)
+	story_body.add_theme_font_size_override("font_size", 20)
 	story_body.add_theme_color_override("font_color", Color(1.0, 0.96, 0.88, 1.0))
 	box.add_child(story_body)
 	var row := HBoxContainer.new()
@@ -891,7 +898,7 @@ func _build_story() -> void:
 	row.add_child(spacer)
 	var btn := Button.new()
 	btn.text = "继续 ▸"
-	btn.add_theme_font_size_override("font_size", 14)
+	btn.add_theme_font_size_override("font_size", 18)
 	GameManager.style_button(btn)
 	btn.pressed.connect(_advance_line)
 	row.add_child(btn)
@@ -965,12 +972,12 @@ func _bubble(g: Guest, text: String, glow := false) -> void:
 	_bubble_left = BUBBLE_SECONDS
 	var label := Label.new()
 	label.text = text
-	label.size = Vector2(140, 40)
+	label.size = Vector2(240, 64)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_font_size_override("font_size", 16)
 	label.add_theme_constant_override("outline_size", 4)
 	label.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.9))
 	label.add_theme_color_override("font_color", Color(0.72, 0.95, 1.0) if glow else Color(1.0, 0.96, 0.86))
@@ -1024,15 +1031,35 @@ func _on_guest_seated(g: Guest) -> void:
 	var line := GameManager.pick_line("grumble", g.species, GameManager.story_ctx(g.species, g.affinity))
 	_bubble(g, _flat(line))
 
-## 半程：一句自言自语。稀有句由 pick_line 降过权，这里只管贴上去
+## 半程：一句自言自语。稀有句由 pick_line 降过权，这里只管贴上去。
+## 五成概率改口点评屋里摆的件——玩家花金币布置，客人就得认得出来
 func _on_guest_murmured(g: Guest) -> void:
-	var line := GameManager.pick_line("murmur", g.species, GameManager.story_ctx(g.species, g.affinity))
+	var line: Dictionary = _propchat_line(g) if randf() < 0.5 else {}
+	if line.is_empty():
+		line = GameManager.pick_line("murmur", g.species, GameManager.story_ctx(g.species, g.affinity))
 	_bubble(g, _flat(line), String(line.get("bubbleStyle", "")) == "glow")
 
-## 离店：道别走对白卡，顺手掷一次留信的骰子（信次日才到）
+## 从本房已摆的设施里随机挑一件说它的专属词：全说过就交回物种 murmur
+func _propchat_line(g: Guest) -> Dictionary:
+	var ids: Array[String] = []
+	for e: Dictionary in GameManager.room_facilities(String(GameManager.current_room)):
+		var fid := String(e.id)
+		if not ids.has(fid) and not Story.entries("propchat", fid).is_empty():
+			ids.append(fid)
+	if ids.is_empty():
+		return {}
+	ids.shuffle()
+	return GameManager.pick_line("propchat", ids[0], GameManager.story_ctx(g.species, g.affinity))
+
+## 离店：合拍的那批才道别，顺手掷一次留信的骰子（信次日才到）
 func _on_guest_leaving(g: Guest) -> void:
 	var ctx := GameManager.story_ctx(g.species, g.affinity)
-	_say(g.guest_name, _nickname(g.species), GameManager.pick_line("farewell", g.species, ctx))
+	# 踩雷的落位时已经抱怨过一句，合拍的才轮到道别——两头都给就是每只客人两句台词，
+	# 挂着玩的人根本点不过来。道别走头顶白字，底部那条横带留给玩家自己点开的内容
+	if g.affinity >= 0:
+		var bye := GameManager.pick_line("farewell", g.species, ctx)
+		if not bye.is_empty():
+			_bubble(g, _flat(bye))
 	var letter := GameManager.post_letter(g.species, ctx)
 	if not letter.is_empty():
 		_toast("%s 留了一封信，明天送到" % g.guest_name)
@@ -1124,7 +1151,7 @@ func _build_mail() -> void:
 	box.add_theme_constant_override("separation", 8)
 	card.add_child(box)
 	mail_head = Label.new()
-	mail_head.add_theme_font_size_override("font_size", 18)
+	mail_head.add_theme_font_size_override("font_size", 22)
 	mail_head.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	box.add_child(mail_head)
 	var scroll := ScrollContainer.new()
@@ -1144,7 +1171,7 @@ func _build_mail() -> void:
 	mail_text = Label.new()
 	mail_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mail_text.custom_minimum_size = Vector2(532, 0)
-	mail_text.add_theme_font_size_override("font_size", 15)
+	mail_text.add_theme_font_size_override("font_size", 18)
 	mail_text.add_theme_color_override("font_color", Color(1.0, 0.96, 0.88, 1.0))
 	mail_detail.add_child(mail_text)
 	var row := HBoxContainer.new()
@@ -1181,7 +1208,7 @@ func _refresh_mail() -> void:
 	if GameManager.mailbox.is_empty():
 		var tip := Label.new()
 		tip.text = "还没有信。多接待几位熟客，信会自己找上门。"
-		tip.add_theme_font_size_override("font_size", 14)
+		tip.add_theme_font_size_override("font_size", 18)
 		tip.add_theme_color_override("font_color", Color(0.82, 0.78, 0.86, 1.0))
 		mail_list.add_child(tip)
 		return
@@ -1270,17 +1297,17 @@ func _build_report() -> void:
 	card.add_child(box)
 	report_title = Label.new()
 	report_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	report_title.add_theme_font_size_override("font_size", 20)
+	report_title.add_theme_font_size_override("font_size", 24)
 	report_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	box.add_child(report_title)
 	report_body = Label.new()
 	report_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	report_body.add_theme_font_size_override("font_size", 14)
+	report_body.add_theme_font_size_override("font_size", 18)
 	report_body.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82, 1.0))
 	box.add_child(report_body)
 	var btn := Button.new()
 	btn.text = "开始新的一天"
-	btn.add_theme_font_size_override("font_size", 14)
+	btn.add_theme_font_size_override("font_size", 18)
 	GameManager.style_button(btn)
 	btn.pressed.connect(_close_report)
 	box.add_child(btn)
@@ -1365,13 +1392,13 @@ func _try_spawn() -> void:
 		var ctx := GameManager.story_ctx(species_id, guest.affinity)
 		var intro := GameManager.pick_line("intro", species_id, ctx)
 		if not intro.is_empty():
-			# 首句挂到卡片上，剩下的挂在这只客人身上：点他这一下才把整段介绍放完
-			guest.pending_intro = intro
-			if _say(guest.guest_name, _nickname(species_id), intro):
-				# 进队播出去了才记「已介绍过」：被队列顶掉的那次不许偷记，否则这段台词凭空没了
-				GameManager.mark_intro_seen(species_id)
-				var segs: Array = Story.segments(intro)
-				guest.pending_intro = {"segments": segs.slice(1)} if segs.size() > 1 else {}
+			# 头一句从头顶白字冒出去：底部那条横带只放玩家自己点开的内容。
+			# 剩下的仍挂在这只客人身上，点他这一下才把整段介绍放完
+			var segs: Array = Story.segments(intro)
+			if not segs.is_empty():
+				_bubble(guest, String(segs[0]).strip_edges())
+			GameManager.mark_intro_seen(species_id)
+			guest.pending_intro = {"segments": segs.slice(1)} if segs.size() > 1 else {}
 	if GameManager.note_species(species_id):
 		_toast("图鉴新增：%s" % String(GameData.species(species_id).name))
 	_update_hud()
@@ -1507,7 +1534,7 @@ func _update_hud() -> void:
 
 func _update_clock() -> void:
 	var p: Dictionary = GameManager.period()
-	%ClockLabel.text = "第 %d 天 %s %s ×%.1f" % [GameManager.day, GameManager.clock_text(), p.name, GameManager.income_mult()]
+	%ClockLabel.text = "第%d天 %s %s×%.1f" % [GameManager.day, GameManager.clock_text(), p.name, GameManager.income_mult()]
 
 func _unhandled_input(event: InputEvent) -> void:
 	if report_panel != null and report_panel.visible:
