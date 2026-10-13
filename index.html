@@ -369,6 +369,10 @@ const FACILITIES={
 const POOL_IDS=['hot','milk','yuzu','herb','ice','sand','cyber','moon','moss','stone'];
 const DECO_IDS=['lantern','bench','vender','camera','plant','bucket','tea'];
 const EFF_NAMES={coin:'产币',joy:'开心',fame:'声望',explore:'探索',relax:'放松',social:'社交',effcy:'效率',sign:'招牌'};
+/* 模拟真正读到的功效只有这三个（soak 里 sat 用 joy/relax、产币用 coin）。
+   其余键写在表里是文案，不是机制——面板上不再给它们带数值的 Lv 与进度条，
+   免得玩家照着「社交 2」去布置，而那一栏其实一分作用没有。 */
+const EFF_LIVE={coin:1,joy:1,relax:1};
 
 /* ---------------- 房间数据 ---------------- */
 const ROOMS=[
@@ -2069,7 +2073,8 @@ function openCase(){
 /* ---------------- 泡澡碎碎念 ---------------- */
 function soakChatter(gu){
  if(G.paused||!G.running)return;
- gu.chatterT-=1/60;
+ // 倒计时只归模拟管：update 里已经按 dt 减过，绘制这一路再减一次 1/60
+ // 就等于「画得越快话越多」，碎碎念的密度成了帧率的函数
  if(gu.chatterT>0)return;
  gu.chatterT=9+rnd(14);
  if(G.guests.filter(g=>g.room===gu.room).length>4)return;
@@ -2248,7 +2253,8 @@ function openBuild(){
   html+=`<div style="color:#ffd45e;letter-spacing:2px;margin:4px 0">${gname}</div>`;
   for(const id of ids){
    const f=FACILITIES[id];
-   const effs=Object.entries(f.eff||{}).filter(([k,v])=>v>0).map(([k,v])=>`<span class="tag">${EFF_NAMES[k]}${v}</span>`).join('');
+   const effs=Object.entries(f.eff||{}).filter(([k,v])=>v>0)
+    .map(([k,v])=>`<span class="tag">${EFF_NAMES[k]}${EFF_LIVE[k]?v:'·氛围'}</span>`).join('');
    const cnt=id==='lantern'?`（已挂 ${placedOf().filter(p=>p.id==='lantern').length}/${f.maxCount}）`:'';
    html+=`<div class="row"><canvas data-fac="${id}" width="34" height="26"></canvas>
     <div class="info"><div class="name">${f.name}${cnt} <span class="dim" style="color:#ffd45e">🪙${f.cost}</span></div>
@@ -2279,10 +2285,15 @@ function openFacPanel(p){
  const isPool=f.kind==='pool';
  let effHtml='';
  for(const[k,v]of Object.entries(f.eff||{})){
-  if(!v&&!isPool)continue;
+  if(!v)continue;
+  if(!EFF_LIVE[k]){
+   // 不起作用的键不再配数字：只有名字与那句氛围文案，摆位由审美决定，不由伪数值决定
+   effHtml+=`<div class="kv"><span>${EFF_NAMES[k]} <span class="mut">${EFF_PHRASE[k]}</span></span><b style="color:#c7b8d8">氛围</b></div>`;
+   continue;
+  }
   const lv=v*p.level;
-  effHtml+=`<div class="kv"><span>${EFF_NAMES[k]} <span class="mut">${lv>0?EFF_PHRASE[k]:'—'}</span></span><b>Lv${lv}</b></div>`+
-   (lv>0?`<div class="bar"><i style="width:${clamp(lv*18,4,100)}%"></i></div>`:'');
+  effHtml+=`<div class="kv"><span>${EFF_NAMES[k]} <span class="mut">${EFF_PHRASE[k]}</span></span><b>Lv${lv}</b></div>`+
+   `<div class="bar"><i style="width:${clamp(lv*18,4,100)}%"></i></div>`;
  }
  let extra='';
  if(isPool){
@@ -2317,7 +2328,10 @@ function demolish(p){
  const arr=placedOf();const i=arr.indexOf(p);if(i<0)return;
  for(const gu of G.guests)if(gu.poolUid===p.uid){gu.state='wander';gu.poolUid=null;gu.block=null;gu.wanderT=.4;}
  arr.splice(i,1);
- closeModal();SFX.pop();toast('已拆除','#ffb45e');
+ // 按钮上写了返多少就得真返多少：这笔钱以前只是写着好看
+ const refund=Math.round(FACILITIES[p.id].cost*.5*p.level);
+ G.coins+=refund;
+ closeModal();SFX.pop();toast(`已拆除，退回 ${refund} 金币`,'#ffb45e');
 }
 
 /* ============================================================
@@ -2411,8 +2425,12 @@ function checkLevelEnd(){
  const lv=G.level;if(!lv)return;
  if(G.day>lv.days||lv.goals.every(g=>goalVal(g)>=g.n)){
   const ok=lv.goals.every(g=>goalVal(g)>=g.n);
-  const margin=(lv.days-(G.day-1))/lv.days;
-  const rank=!ok?'C':(margin>=.5?'S':margin>=.15?'A':'B');
+  // 评级看的是「还剩几天」而不是「过了几天」：原来用 (days-(day-1))/days，
+  // 三天的关卡最快也只到 0.33，B 级根本发不出去；两天的关卡拖到最后一天反而够到 S。
+  // 现在按余量归一：第一天收工=1，用满最后一天=0，S/A/B 三档都真拿得到。
+  const daysLeft=Math.max(0,lv.days-G.day+1);
+  const slack=lv.days<=1?1:(daysLeft-1)/(lv.days-1);
+  const rank=!ok?'C':(slack>=.66?'S':slack>=.33?'A':'B');
   const reward=ok?lv.reward+(rank==='S'?2:0):0;
   if(ok){G.gems+=reward;G.levelDone[lv.id]=(G.levelDone[lv.id]&&G.levelDone[lv.id]!=='C')?(G.levelDone[lv.id]<rank?rank:G.levelDone[lv.id]):rank;}
   try{localStorage.setItem(SAVEKEY+'.levels',JSON.stringify(G.levelDone));}catch(e){saveErr('保存关卡进度',e);}
