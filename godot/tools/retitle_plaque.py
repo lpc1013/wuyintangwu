@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "assets", "bg", "title.png")
 CACHE = os.path.join(ROOT, "tools", "_cache", "title_plaque_src.png")
-TEXT = "雾隐汤屋"
+TEXT = "雾隐汤屋2"
 FONT = "C:/Windows/Fonts/STKAITI.TTF"
 SIZE = 26
 THRESHOLD = 25

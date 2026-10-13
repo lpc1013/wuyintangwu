@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="雾隐汤屋 · 像素动物温泉物语"
+config/name="雾隐汤屋2 · 像素动物温泉物语"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/ui/icon.png"
