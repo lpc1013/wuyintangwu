@@ -16,12 +16,15 @@ SRC = os.path.join(ROOT, "assets", "bg", "title.png")
 CACHE = os.path.join(ROOT, "tools", "_cache", "title_plaque_src.png")
 TEXT = "雾隐汤屋2"
 FONT = "C:/Windows/Fonts/STKAITI.TTF"
-SIZE = 26
+# 「雾隐汤屋2」是五个字，原 SIZE=26 + 100px 框（按四字设计）会左右裁掉首尾。
+# 降到 24 后五字掩码约 103px，与原四字 102px 同宽，落在略加宽的框内刚好不裁。
+SIZE = 24
 THRESHOLD = 25
 INK = (33, 17, 11)
 
 # 匾额内可涂改的矩形：左右避开雕花，上下避开边框暗部
-BAND = (398, 145, 498, 169)
+# （由 (398,145,498,169) 微调：中心仍 448，宽 100→106 以容五字）
+BAND = (395, 145, 501, 169)
 
 
 def lum(p):
