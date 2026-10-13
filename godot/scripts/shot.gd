@@ -99,7 +99,8 @@ func _process(_delta: float) -> bool:
 		_boot()
 	elif panel_mode == "report" and frame == wait_frames - 6:
 		_seed_ledger()
-	elif panel_mode == "story" and story_kind == "bubble" and not bubble_done and frame > 4:
+	elif panel_mode == "story" and (story_kind == "bubble" or story_kind == "propchat") \
+			and not bubble_done and frame > 4:
 		_try_bubble()
 	elif panel_mode == "gait":
 		_try_gait()
@@ -299,11 +300,23 @@ func _try_bubble() -> void:
 		return
 	if current_scene._bubble_left > 0.0:
 		return
+	if story_kind == "propchat" and gm.room_facilities(gm.current_room).is_empty():
+		# 点评气泡得屋里真有摆件：借建造截图那套演示件真买真放
+		gm.facilities.clear()
+		gm.coins = 900
+		for id: String in ["bench", "vender", "plant", "bucket"]:
+			for l: Rect2 in gm.room_cfg(gm.current_room).lots:
+				var p: Vector2 = gm.snap_center(id, l.get_center())
+				if gm.buy_facility(String(gm.current_room), id, p):
+					current_scene._add_facility_node(id, p)
+					break
 	for g: Node in get_nodes_in_group("guests"):
 		if not g.has_method("state_name") or String(g.state_name()) != "STAY":
 			continue
 		var sp := String(g.species)
 		var line: Dictionary = gm.pick_line("murmur", sp, gm.story_ctx(sp, int(g.affinity)))
+		if story_kind == "propchat":
+			line = current_scene._propchat_line(g)
 		var text := "\n".join(Story.segments(line))
 		# 低好感的生客常常一句都不该说：空的直接跳过，别把「截到了」当成截到了
 		if text.strip_edges() == "":
@@ -322,7 +335,8 @@ func _try_bubble() -> void:
 		wait_frames = frame + 1
 
 func _capture() -> void:
-	if panel_mode == "build":
+	# 空 build_id 是「只开面板不选件」的截法：没有幽灵就没什么可报的
+	if panel_mode == "build" and build_id != "":
 		current_scene._update_ghost(current_scene.get_global_mouse_position())
 		var gpos: Vector2 = current_scene.ghost.position
 		print("GHOST snapped=", gpos, " ok=", gm.can_place(gm.current_room, build_id, gpos))

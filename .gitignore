@@ -13,9 +13,11 @@ Desktop.ini
 Spring/_原图备份/
 Spring/_精修备份/
 
-# 校验用截帧与拼条：约定下划线开头即可丢弃，shot.gd / spritesheet.gd / tools 下的脚本随时能重跑
-# 注意 vibe_images/refined_* 生成母版不在忽略之列——图像生成不可复现，那是唯一的源
-vibe_images/_*.png
+# vibe_images/：即梦 AI 生图全量工作目录（ai_raw 原图 / alt 备选 / rejected 废稿 / refined 终稿 /
+# items_raw / items_crops）。AI 生图不可复现，本地 D: 盘作为唯一母版源长期保留；但公开库只收
+# 游戏自用的 godot/assets/ 处理纹理，这 65MB 生图稿整体不入公开库（本地文件不动，仅从 git 跟踪移除）。
+# 本行通配整目录，优先级高于下面按文件名的零散规则。若日后要让 GitHub 兜底这批原稿，删掉本行 + git add -f 即可。
+vibe_images/
 
 # 校验脚本的一次性存档目录：跑 headless 前把 APPDATA 指到这里，别碰真实进度
 # 前缀是 _userdata 的都算——临时另开的隔离目录重跑就有，不必入库
@@ -54,3 +56,9 @@ vibe_images/ai_raw/sit_todo.json
 vibe_images/ai_raw/sit_fail.json
 vibe_images/ai_raw/soak_todo.json
 vibe_images/ai_raw/soak_fail.json
+
+# WorkBuddy 本地应用产物
+.wbapp_*.genie
+
+# Godot 编辑器本地数据（导出模板/本地进度/设置），非工程源码，不入库
+godot/Godot/

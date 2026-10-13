@@ -51,7 +51,7 @@ func _build_hud() -> void:
 		GameManager.unlocked_count(), GameManager.ROOMS.size()], Color(1.0, 0.94, 0.82, 1.0))
 	## 主线一行：章节名 + 还差多少 + 收藏了几则文案，不必进房间也能看到自己走到哪儿
 	var c := GameManager.chapter_now()
-	_hud_label(HUD_TOP + 22.0, "第 %d 章「%s」 · %s · 文案 %d/%d" % [
+	_hud_label(HUD_TOP + 24.0, "第 %d 章「%s」 · %s · 文案 %d/%d" % [
 		GameManager.chapter + 1, String(c.name), GameManager.chapter_goal(),
 		GameManager.story_log.size(), Story.line_count()], Color(1.0, 0.88, 0.55, 1.0))
 
@@ -64,6 +64,9 @@ func _hud_label(top: float, text: String, color: Color) -> Label:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", 18)
+	# 这两行直接叠在庭园画上，没描边就会被屋檐灰瓦吃掉
+	label.add_theme_constant_override("outline_size", 5)
+	label.add_theme_color_override("font_outline_color", Color(0.09, 0.06, 0.13, 0.92))
 	add_child(label)
 	return label

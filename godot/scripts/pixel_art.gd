@@ -603,6 +603,19 @@ static func facility_texture(id: String) -> Texture2D:
 			_facility_cache[id] = ImageTexture.create_from_image(make_facility(id))
 	return _facility_cache[id]
 
+static var _preview_cache := {}
+
+## 调色板缩略图：物品贴图是 2px 实心块，最近邻折半恰好一格采一色，零模糊
+static func facility_preview_texture(id: String) -> Texture2D:
+	if not _preview_cache.has(id):
+		var src := facility_texture(id).get_image()
+		var w := src.get_width()
+		var h := src.get_height()
+		if w % 2 == 0 and h % 2 == 0:
+			src.resize(w / 2, h / 2, Image.INTERPOLATE_NEAREST)
+		_preview_cache[id] = ImageTexture.create_from_image(src)
+	return _preview_cache[id]
+
 static func make_facility(id: String) -> Image:
 	match id:
 		"lantern": return _f_lantern()

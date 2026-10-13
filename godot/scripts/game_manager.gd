@@ -816,7 +816,8 @@ func style_button(button: Button) -> void:
 	base.border_color = Color(0.95, 0.8, 0.45, 1.0)
 	base.set_border_width_all(2)
 	base.set_corner_radius_all(0)
-	base.set_content_margin_all(6)
+	# 字号抬到 18 后顶栏一度撑爆 896：内边距从 6 收到 4 把宽度还给 HUD
+	base.set_content_margin_all(4)
 	var hover: StyleBoxFlat = base.duplicate()
 	hover.bg_color = Color(0.18, 0.11, 0.24, 0.92)
 	var pressed: StyleBoxFlat = base.duplicate()
@@ -832,7 +833,7 @@ func style_button(button: Button) -> void:
 	button.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.99, 0.92, 1.0))
 	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.66, 1.0))
-	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_font_size_override("font_size", 18)
 	if button.custom_minimum_size.y < TOUCH_BUTTON_HEIGHT:
 		button.custom_minimum_size.y = TOUCH_BUTTON_HEIGHT
 

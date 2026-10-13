@@ -72,6 +72,18 @@ func _run() -> void:
 					break
 			_truthy("%s 地面块 %d 容得下设施" % [room, li], held)
 
+	# 1b. 摆件点评表按设施 id 索引：每件都得有词，id 不许撞车也不许冒出目录外的
+	var pc_table: Dictionary = Story.channel("propchat")
+	var pc_ids := {}
+	for id: String in GameData.FACILITY_IDS:
+		_truthy("propchat 有「%s」" % id, (pc_table.get(id, []) as Array).size() >= 2)
+	for tid: String in pc_table:
+		_truthy("propchat 键「%s」在设施目录里" % tid, GameData.FACILITY_IDS.has(tid))
+		for e: Dictionary in pc_table[tid]:
+			var eid := String(e.id)
+			_truthy("propchat id 不重复「%s」" % eid, not pc_ids.has(eid))
+			pc_ids[eid] = true
+
 	# 2. 购买扣币并入库；同一位置不可重复
 	var cost := int(GameData.facility("vender").cost)
 	var before: int = gm.coins
@@ -610,8 +622,8 @@ func _check_review() -> void:
 			widest = label
 	var stamp := "阿橘 ★★★★★「%s」 ✓%s 声望 +100" % [longest, widest]
 	# 14 号字里一个汉字/星号约占 14px，空格与「」只会更窄，照方块字估是偏严的下限
-	_truthy("最坏拼法仍放得进点评条（%d 字 ≈ %dpx / 872）" % [stamp.length(), stamp.length() * 14],
-			stamp.length() * 14 <= 872)
+	_truthy("最坏拼法仍放得进点评条（%d 字 ≈ %dpx / 872）" % [stamp.length(), stamp.length() * 18],
+			stamp.length() * 18 <= 872)
 
 func _on_report(report: Dictionary) -> void:
 	report_seen = report

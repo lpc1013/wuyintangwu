@@ -5229,6 +5229,155 @@ const MURMUR := {
 	]
 }
 
+## 摆件点评：键是设施 id（不是物种），客人泡到半程有几率夸一句屋里摆的件。
+## 台词 species 中立、两拍短句，跟 murmur 同一种气泡节奏
+const PROPCHAT := {
+	"lantern": [
+		{"id": "pc-lantern-1", "segments": ["「灯底下最暖和。」", "「难怪大家都往这儿凑。」"]},
+		{"id": "pc-lantern-2", "segments": ["「纸糊的，风一吹就晃。」", "「晃得也有道理。」"]},
+	],
+	"bench": [
+		{"id": "pc-bench-1", "segments": ["「这根椅子被人坐热过。」", "「我就不说破。」"]},
+		{"id": "pc-bench-2", "segments": ["「坐着等位。」", "「比站着排队体面。」"]},
+	],
+	"vender": [
+		{"id": "pc-vender-1", "segments": ["「和果子摆得整整齐齐。」", "「今天很争气。」"]},
+		{"id": "pc-vender-2", "segments": ["「路过第三趟了。」", "「手比脑子先付了钱。」"]},
+	],
+	"camera": [
+		{"id": "pc-camera-1", "segments": ["「富士画就挂在这儿。」", "「谁站前面谁上镜。」"]},
+		{"id": "pc-camera-2", "segments": ["「拍完千万别回头。」", "「回头就糊了。」"]},
+	],
+	"plant": [
+		{"id": "pc-plant-1", "segments": ["「叶子好像又绿了一点。」", "「多半是心理作用。」"]},
+		{"id": "pc-plant-2", "segments": ["「有人对它说过话。」", "「它没答应，但听见了。」"]},
+	],
+	"bucket": [
+		{"id": "pc-bucket-1", "segments": ["「新桶有股杉木味。」", "「闻着像还没泡就赚了。」"]},
+		{"id": "pc-bucket-2", "segments": ["「桶摞着桶。」", "「像一屋子没说完的话。」"]},
+	],
+	"tea": [
+		{"id": "pc-tea-1", "segments": ["「麦茶是凉的，团子是软的。」", "「挑不出毛病。」"]},
+		{"id": "pc-tea-2", "segments": ["「自助的意思就是。」", "「再拿一个也没人管。」"]},
+	],
+	"andon_hang": [
+		{"id": "pc-andonhang-1", "segments": ["「灯悬在头顶。」", "「照得谁都不好意思低头。」"]},
+		{"id": "pc-andonhang-2", "segments": ["「绳子要是再长三寸。」", "「我就得绕着走。」"]},
+	],
+	"kakejiku": [
+		{"id": "pc-kakejiku-1", "segments": ["「画里的山比这边的高。」", "「服气。」"]},
+		{"id": "pc-kakejiku-2", "segments": ["「挂轴卷起来是冬天。」", "「展开就是秋天。」"]},
+	],
+	"kouro": [
+		{"id": "pc-kouro-1", "segments": ["「这香讲五德。」", "「我先记住安静这条。」"]},
+		{"id": "pc-kouro-2", "segments": ["「烟直着往上走。」", "「不碰谁，也没人碰它。」"]},
+	],
+	"andon_floor": [
+		{"id": "pc-andonfloor-1", "segments": ["「矮灯挨着地。」", "「连光都是暖乎的。」"]},
+		{"id": "pc-andonfloor-2", "segments": ["「走路看着点它。」", "「它今晚还要亮呢。」"]},
+	],
+	"tetsubin": [
+		{"id": "pc-tetsubin-1", "segments": ["「铁壶哼上了。」", "「水快开了。」"]},
+		{"id": "pc-tetsubin-2", "segments": ["「壶盖一响。」", "「今天的水声归它领唱。」"]},
+	],
+	"chawan": [
+		{"id": "pc-chawan-1", "segments": ["「碗沿有个小缺口。」", "「正好贴着嘴唇。」"]},
+		{"id": "pc-chawan-2", "segments": ["「半盏麦茶。」", "「多了反而喝不出香。」"]},
+	],
+	"clay_teapot": [
+		{"id": "pc-clayteapot-1", "segments": ["「壶嘴冲着哪边。」", "「我就坐哪边等。」"]},
+		{"id": "pc-clayteapot-2", "segments": ["「紫砂养得久了。」", "「空壶倒水也有味。」"]},
+	],
+	"bowls_stack": [
+		{"id": "pc-bowlsstack-1", "segments": ["「一摞碗晃了一下。」", "「没倒，算它稳。」"]},
+		{"id": "pc-bowlsstack-2", "segments": ["「我数过三回。」", "「每回都少一只，每回又都对。」"]},
+	],
+	"basket": [
+		{"id": "pc-basket-1", "segments": ["「竹篓看着是空的。」", "「其实什么都收。」"]},
+		{"id": "pc-basket-2", "segments": ["「谁扔了块皂进去。」", "「香了整个筐。」"]},
+	],
+	"cushion": [
+		{"id": "pc-cushion-1", "segments": ["「垫子上有别人的体温。」", "「我装作没在意。」"]},
+		{"id": "pc-cushion-2", "segments": ["「坐下去才三秒。」", "「起身的计划取消了。」"]},
+	],
+	"clock": [
+		{"id": "pc-clock-1", "segments": ["「滴答，滴答。」", "「汤还没好，钟先急了。」"]},
+		{"id": "pc-clock-2", "segments": ["「指针比我准时。」", "「这个我认。」"]},
+	],
+	"noren": [
+		{"id": "pc-noren-1", "segments": ["「帘子一掀。」", "「热气先出去打招呼。」"]},
+		{"id": "pc-noren-2", "segments": ["「蓝布上印着汤气。」", "「懂行的隔着街就来了。」"]},
+	],
+	"signboard": [
+		{"id": "pc-signboard-1", "segments": ["「今日汤温四十二。」", "「字是歪的，水不歪。」"]},
+		{"id": "pc-signboard-2", "segments": ["「告示又添了一行小字。」", "「越小的字越要紧。」"]},
+	],
+	"spout": [
+		{"id": "pc-spout-1", "segments": ["「竹笕的水没停过。」", "「它不累，我看着累。」"]},
+		{"id": "pc-spout-2", "segments": ["「哗哗声把话都接住了。」", "「说什么都像对白。」"]},
+	],
+	"washstand": [
+		{"id": "pc-washstand-1", "segments": ["「半盆清水。」", "「照出今天最清醒的我。」"]},
+		{"id": "pc-washstand-2", "segments": ["「木架轻轻响了一声。」", "「它也在伸懒腰。」"]},
+	],
+	"shampoo": [
+		{"id": "pc-shampoo-1", "segments": ["「按两下就够。」", "「有人按了五下，我看见了。」"]},
+		{"id": "pc-shampoo-2", "segments": ["「香香的。」", "「出门前谁都不是秃子。」"]},
+	],
+	"towel_stack": [
+		{"id": "pc-towelstack-1", "segments": ["「叠得这么方正。」", "「都不好意思弄乱它。」"]},
+		{"id": "pc-towelstack-2", "segments": ["「白毛巾摞到了顶。」", "「太阳晒过的味道跑不出来。」"]},
+	],
+	"towel_basket": [
+		{"id": "pc-towelbasket-1", "segments": ["「卷好的毛巾排排躺。」", "「抽一条，谁也别客气。」"]},
+		{"id": "pc-towelbasket-2", "segments": ["「筐里最上面那条。」", "「今天第三次被放回去了。」"]},
+	],
+	"ishidoro": [
+		{"id": "pc-ishidoro-1", "segments": ["「石缝里全是苔。」", "「比我会存年头。」"]},
+		{"id": "pc-ishidoro-2", "segments": ["「石灯一点。」", "「院子立刻有了主角。」"]},
+	],
+	"azalea": [
+		{"id": "pc-azalea-1", "segments": ["「花开到这份上。」", "「蜜蜂都得排号。」"]},
+		{"id": "pc-azalea-2", "segments": ["「五月也就开这一回。」", "「今天算赶上了。」"]},
+	],
+	"oke_lid": [
+		{"id": "pc-okelid-1", "segments": ["「盖上的提手印凹得正好。」", "「每只手都按得准。」"]},
+		{"id": "pc-okelid-2", "segments": ["「木盖一掀。」", "「憋了一路的热气全撒出来。」"]},
+	],
+	"mat": [
+		{"id": "pc-mat-1", "segments": ["「赤脚踩上去。」", "「草席先跟我问好。」"]},
+		{"id": "pc-mat-2", "segments": ["「席子编得密。」", "「灰都插不进去。」"]},
+	],
+	"geta": [
+		{"id": "pc-geta-1", "segments": ["「门口这双木屐。」", "「鞋带还是湿的。」"]},
+		{"id": "pc-geta-2", "segments": ["「咔哒，咔哒。」", "「穿它的人走路很急。」"]},
+	],
+	"stool_towel": [
+		{"id": "pc-stooltowel-1", "segments": ["「凳上的巾叠得规矩。」", "「没人看着也这么标准。」"]},
+		{"id": "pc-stooltowel-2", "segments": ["「小木凳吱呀一声。」", "「算是打过招呼了。」"]},
+	],
+	"ladder": [
+		{"id": "pc-ladder-1", "segments": ["「扶着杆子下池。」", "「体面，比跳下去强。」"]},
+		{"id": "pc-ladder-2", "segments": ["「金属杆泡得凉丝丝。」", "「手比嘴诚实。」"]},
+	],
+	"palm_potted": [
+		{"id": "pc-palmpotted-1", "segments": ["「一蓬叶子撑开来。」", "「浴场也有了夏天。」"]},
+		{"id": "pc-palmpotted-2", "segments": ["「苏铁不着急开花。」", "「我也不着急走。」"]},
+	],
+	"kake_bacho": [
+		{"id": "pc-kakebacho-1", "segments": ["「铁皮桶一手提溜。」", "「打热水的都是老手。」"]},
+		{"id": "pc-kakebacho-2", "segments": ["「桶梁晃了一下。」", "「水一滴没洒。」"]},
+	],
+	"andon_snow": [
+		{"id": "pc-andonsnow-1", "segments": ["「灯顶积了一晚的雪。」", "「光反而更暖。」"]},
+		{"id": "pc-andonsnow-2", "segments": ["「雪见灯不看雪。」", "「看灯的人也高兴。」"]},
+	],
+	"fence": [
+		{"id": "pc-fence-1", "segments": ["「矮栅栏拦不住谁。」", "「但看着就该绕着走。」"]},
+		{"id": "pc-fence-2", "segments": ["「木头晒了一整天。」", "「晚上还带着太阳味。」"]},
+	],
+}
+
 ## 主线阶梯：沿用网页版 15 关的关卡名，达成条件改由本作已有的经营事实驱动
 const CHAPTERS := [
 	{
@@ -5341,6 +5490,8 @@ static func channel(id: String) -> Dictionary:
 			return SURPRISE
 		"prop":
 			return PROP_STORY
+		"propchat":
+			return PROPCHAT
 		"murmur":
 			return MURMUR
 	return {}
@@ -5353,10 +5504,10 @@ static func entries(channel_id: String, key_id: String) -> Array:
 static func profile(species: String) -> Dictionary:
 	return PROFILES.get(species, {})
 
-## 八张台词表。收藏进度的分母、以及「哪些频道存在」都只从这里算，
+## 九张台词表。收藏进度的分母、以及「哪些频道存在」都只从这里算，
 ## 免得 room_view / GameManager 各自抄一份频道清单，早晚和 channel() 走散
 static func channels() -> Array:
-	return [INTRO, CHAT, LETTER, GRUMBLE, FAREWELL, SURPRISE, PROP_STORY, MURMUR]
+	return [INTRO, CHAT, LETTER, GRUMBLE, FAREWELL, SURPRISE, PROP_STORY, PROPCHAT, MURMUR]
 
 ## 台词总条数（不含档案）：玩家读过的条数拿它当分母
 static func line_count() -> int:
