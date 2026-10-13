@@ -255,15 +255,15 @@ const FACILITIES := {
 	"basket": {"name": "竹篓", "cost": 25, "w": 33, "h": 27,
 		"eff": {}, "desc": "空着的竹编收纳篓，什么都往里扔。"},
 	"cushion": {"name": "坐垫", "cost": 20, "w": 55, "h": 34, "nap": true,
-		"eff": {"relax": 1}, "desc": "橙格纹的软垫，坐下去就不想起来。"},
+		"eff": {"relax": 1, "social": 1}, "desc": "橙格纹的软垫，坐下去就不想起来。"},
 	"clock": {"name": "挂钟", "cost": 40, "w": 17, "h": 17, "wall_only": true,
 		"eff": {"effcy": 1}, "desc": "滴答滴答，提醒师傅汤还没烧好。"},
 	"noren": {"name": "暖帘", "cost": 50, "w": 67, "h": 43, "wall_only": true,
 		"eff": {"fame": 1}, "desc": "印着汤气的蓝布帘，行家一看就知道有热水。"},
 	"signboard": {"name": "木告示牌", "cost": 30, "w": 25, "h": 47,
-		"eff": {}, "desc": "今日汤温与注意事项，字是手写歪的。"},
+		"eff": {"sign": 1}, "desc": "今日汤温与注意事项，字是手写歪的。"},
 	"spout": {"name": "竹笕流水", "cost": 90, "w": 70, "h": 65,
-		"eff": {"joy": 1, "relax": 1}, "desc": "竹笕引活水，哗哗响着就不冷清。"},
+		"eff": {"joy": 1, "relax": 1, "explore": 1}, "desc": "竹笕引活水，哗哗响着就不冷清。"},
 	"washstand": {"name": "洗漱台", "cost": 55, "w": 37, "h": 55,
 		"eff": {"relax": 1}, "desc": "木盆搁在矮架上，盆里接了半盆清水。"},
 	"shampoo": {"name": "洗发液瓶", "cost": 15, "w": 12, "h": 32,
@@ -279,7 +279,7 @@ const FACILITIES := {
 	"oke_lid": {"name": "杉木盖桶", "cost": 50, "w": 47, "h": 46,
 		"eff": {}, "desc": "带木盖的大桶，盖子上还凹着提手位。"},
 	"mat": {"name": "草席", "cost": 40, "w": 76, "h": 42,
-		"eff": {"relax": 1}, "desc": "编得密密的稻草席，赤脚踩上去刚刚好。"},
+		"eff": {"relax": 1, "social": 1}, "desc": "编得密密的稻草席，赤脚踩上去刚刚好。"},
 	"geta": {"name": "木屐", "cost": 15, "w": 35, "h": 22,
 		"eff": {}, "desc": "一双脱在门口的木屐，带子是红的。"},
 	"stool_towel": {"name": "汤台小凳", "cost": 30, "w": 35, "h": 35,
@@ -320,24 +320,82 @@ const WISHES := {
 ## 坐着消磨时间才完成得了的心愿：茶室客人只会许这些
 const WISH_SEATED := ["tea", "nap", "chat", "alone"]
 
-const REVIEW_LINES := [
-	"汤很暖，下次还来。",
-	"泡完毛都顺了。",
-	"水有点烫，但是舒服。",
-	"安静，适合发呆。",
-	"人有点多，没泡尽兴。",
-	"心愿达成了，今天圆满。",
-	"差点意思，想泡的池没排上。",
-	"灯影很好看，记了一路。",
-]
+## 点评文案按星级分三档。原来是一锅通用语料随机抽，抽出来的话会和高星差评打架：
+## 给五星的客人说「差点意思，想泡的池没排上」，玩家就再从这句话里学不到任何经营规则。
+## positive 烫金、neutral 中性、negative 发馊的红，档位由 review_band() 定。
+const REVIEW_ONSEN := {
+	"positive": [
+		"汤很暖，下次还来。",
+		"泡完毛都顺了，尾巴到现在还是蓬的。",
+		"水有点烫，但是舒服。",
+		"灯影很好看，记了一路。",
+	],
+	"neutral": [
+		"安静，适合发呆。",
+		"泡完了。说不上特别好，也不差。",
+		"水汽糊了眼睛，看什么都是软的。",
+	],
+	"negative": [
+		"人有点多，没泡尽兴。",
+		"水凉得比想象中快。",
+		"这池子今天不太对味。",
+	],
+}
 ## 茶室客人不下水，点评里自然也不该抱怨池子排不上
-const REVIEW_LINES_LOUNGE := [
-	"麦茶是热的，榻榻米也是。",
-	"坐了一下午，什么都没想。",
-	"团子很软，下次带朋友来。",
-	"这里安静，耳朵终于不响了。",
-	"坐垫偏硬，膝盖到现在还麻。",
+const REVIEW_LOUNGE := {
+	"positive": [
+		"麦茶是热的，榻榻米也是。",
+		"团子很软，下次带朋友来。",
+		"坐了一下午，什么都没想。",
+	],
+	"neutral": [
+		"这里安静，耳朵终于不响了。",
+		"茶凉得有点快。",
+	],
+	"negative": [
+		"坐垫偏硬，膝盖到现在还麻。",
+		"隔壁那桌聊得比茶壶还响。",
+	],
+}
+## 负面档优先说原因：踩了雷、心愿落空、池子太挤，各有各的说法。
+## 玩家要的是「我哪儿经营得不好」，不是一句笼统的不满。
+const REVIEW_CAUSE_WRONG_POOL := [
+	"想泡的不是这一池，水一沾身就知道错了。",
+	"说是特调，偏偏是我最不对味的那味。",
 ]
+const REVIEW_CAUSE_WISH_MISS := [
+	"想要的那样东西今天没等着，白跑一趟。",
+	"冲着它来的，结果那儿空着。",
+]
+const REVIEW_CAUSE_CROWDED := [
+	"下脚的地方都没有，泡两分钟就起来了。",
+	"池边全是影子，暖不暖都分不清。",
+]
+## 心愿达成时不抽通用池：那句「今天圆满」就是这一单的结果，值得单独说
+const REVIEW_WISH_DONE := ["心愿达成了，今天圆满。"]
+
+## 星级 → 档位：四星以上算好评，三星中性，两星以下算差评
+static func review_band(stars: int) -> String:
+	if stars >= 4:
+		return "positive"
+	return "neutral" if stars >= 3 else "negative"
+
+## 拼一句点评。原因优先于通用语料，茶室永远不拿池子的话头说事；
+## 星级与原因由调用方一起交进来，这里不重算——重算就会和 star_rating() 打两份账。
+static func review_text(stars: int, lounge: bool, wish_done: bool, affinity: int, peers: int) -> String:
+	var band := review_band(stars)
+	var table: Dictionary = REVIEW_LOUNGE if lounge else REVIEW_ONSEN
+	# 茶室不下水：踩雷与太挤这两条原因在那儿说不通
+	if not lounge:
+		if band == "negative" and affinity < 0:
+			return String(REVIEW_CAUSE_WRONG_POOL.pick_random())
+		if band != "positive" and peers >= 2:
+			return String(REVIEW_CAUSE_CROWDED.pick_random())
+	if band != "positive" and not wish_done:
+		return String(REVIEW_CAUSE_WISH_MISS.pick_random())
+	if wish_done:
+		return String(REVIEW_WISH_DONE.pick_random())
+	return String((table[band] as Array).pick_random())
 
 static func species_ids() -> Array:
 	return SPECIES.keys()
@@ -386,10 +444,24 @@ static func upgrade_cost(type_id: String, level: int) -> int:
 	var raw := float(u.base_cost) * pow(float(u.cost_step), float(maxi(1, level) - 1)) * roomy
 	return int(round(raw))
 
+## 席位占的最小宽度：池子再长也只按这个格数排人。
+## 池宽→位数这条规则只在这一处，视图与心愿判定都从这里取，别各抄一份
+const SLOT_MIN_WIDTH := 72.0
+
+static func width_slots(rect_width: float) -> int:
+	return maxi(1, int(rect_width / SLOT_MIN_WIDTH))
+
 ## 升级后的池位容量：汤种基础位 + 每级赠送位，但不超过池子宽度容得下的位数
 static func level_cap(type_id: String, level: int, by_width: int) -> int:
 	var extra: int = int(UPGRADE.cap_per_level) * maxi(0, level - 1)
 	return clampi(mini(int(pool(type_id).get("cap", 4)) + extra, by_width), 1, by_width)
+
+## 席位的最后一道闸：背景画死了坐垫数量，多出来的位子没地方坐。
+## 真实容量、扩建前后的差额、面板说明三处共用这一个算式——
+## 少抄一处就会出现「花了钱、等级升了、位一个没多」那种说不出口的差
+static func seat_cap(type_id: String, level: int, by_width: int, drawn_seats: int) -> int:
+	var n := level_cap(type_id, level, by_width)
+	return mini(n, drawn_seats) if drawn_seats > 0 else n
 
 ## 升级后的单日投币额度；不产币的汤种返回 0 表示不设限
 static func level_budget(type_id: String, level: int) -> int:

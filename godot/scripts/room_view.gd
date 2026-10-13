@@ -10,22 +10,8 @@ const SEAT_TINT := Color(1.0, 0.72, 0.35, 0.2)
 const SPAWN_TINT := Color(1.0, 0.24, 0.71, 0.9)
 const LOT_TINT := Color(0.55, 0.95, 0.62, 0.2)
 const LOT_EDGE := Color(0.62, 1.0, 0.7, 0.85)
-const NIGHT_TINT := Color(0.06, 0.08, 0.22)
-## 夜罩把画面压蓝，暖光再把它焐回来：同一张径向衰减贴图，靠 modulate 分色
-const LAMP_GLOW := Color(1.0, 0.74, 0.4)
-const WATER_GLOW := Color(0.46, 0.8, 0.95)
-## 背景里那几盏灯笼只有十几像素宽，光晕再放一圈就要把整盏灯糊成白斑
-const LAMP_GLOW_SCALE := 2.0
-const LANTERN_GLOW_SCALE := 1.7
-## 灯光峰值不拉满：ADD 混合下 1.0 直接过曝，留出余量让火苗的抖动看得见
-const LAMP_GLOW_ALPHA := 0.62
-const WATER_GLOW_ALPHA := 0.24
-## 纸灯笼里的火苗不该是死的：整幅光按正弦轻轻抖，幅度小到不抢戏
-const FLICKER_AMPLITUDE := 0.09
-const FLICKER_SPEED := 3.4
 const SPAWN_INTERVAL := 1.5
 const MAX_GUESTS := 8
-const SLOT_MIN_WIDTH := 72.0
 const EXIT_POS := Vector2(448, 560)
 const SPAWN_CLEARANCE := 48.0
 const TOAST_SECONDS := 3.0
@@ -99,13 +85,7 @@ var pools: Array[Dictionary] = []
 var guests: Array[Node2D] = []
 var spawn_acc := 0.8
 var cfg: Dictionary = {}
-var night_rect: ColorRect
-var night_layer: CanvasLayer
-var lamp_glows: Array[Sprite2D] = []
-var lantern_glows: Array[Sprite2D] = []
-var water_glows: Array[Sprite2D] = []
-var _glow_mat: CanvasItemMaterial
-var _glow_time := 0.0
+var night_veil: NightVeil
 var _toast_left := 0.0
 var build_mode := false
 var build_id := ""
@@ -170,6 +150,8 @@ func _ready() -> void:
 	if cfg.is_empty():
 		push_error("当前房间无配置: " + GameManager.current_room)
 		return
+	# 进了店才开始计时：标题画面与案内图都把时钟停着，客人也在这一刻才开始生
+	GameManager.start_sim()
 	hud = get_node("HUD")
 	%BG.texture = load(cfg.bg)
 	%RoomLabel.text = cfg.label
@@ -185,11 +167,11 @@ func _ready() -> void:
 	_build_story()
 	_build_mail()
 	_build_review()
-	_build_night_tint()
+	_build_night()
 	GameManager.day_reported.connect(_on_day_reported)
 	GameManager.mail_arrived.connect(_on_mail_arrived)
 	GameManager.chapter_advanced.connect(_on_chapter_advanced)
-	GameManager.style_button(%BackButton)
+	UiTheme.style_button(%BackButton)
 	%BackButton.pressed.connect(GameManager.goto_map)
 	_build_dock()
 	for label: Label in [%RoomLabel, %CoinsLabel, %ClockLabel, %StarsLabel, %Toast]:
@@ -199,92 +181,28 @@ func _ready() -> void:
 	%Toast.add_theme_color_override("font_color", Color(1.0, 0.88, 0.55, 1.0))
 	_update_hud()
 
-func _build_night_tint() -> void:
-	night_layer = CanvasLayer.new()
-	night_layer.layer = 5
-	add_child(night_layer)
-	night_rect = ColorRect.new()
-	night_rect.size = GameManager.VIEWPORT_SIZE
-	night_rect.color = Color(NIGHT_TINT, 0.0)
-	night_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	night_layer.add_child(night_rect)
-	_build_glows()
-
-## 三处光源：背景里本来就画好的灯笼（ROOMS.lights）、玩家挂上墙的纸灯笼、
-## 以及汤面自己泛起来的那层光。全部排在夜罩之后，ADD 混合只加亮不遮挡，
-## 等于在被染蓝的画面上重新点火。
-func _build_glows() -> void:
-	for i in cfg.get("lights", []).size():
-		var pos: Vector2 = cfg["lights"][i]
-		var g := _make_glow(pos, LAMP_GLOW_SCALE, LAMP_GLOW)
-		g.set_meta("ph", float(i) * 1.7)
-		night_layer.add_child(g)
-		lamp_glows.append(g)
+func _build_night() -> void:
+	night_veil = NightVeil.new()
+	add_child(night_veil)
+	var water: Array = []
+	# 茶室没有水面：榻榻米泛光只会看着像一池子东西能踩
 	if not GameManager.is_lounge(GameManager.current_room):
 		for p: Dictionary in pools:
-			var rect: Rect2 = p.rect
-			var w := _make_glow(rect.get_center(), 1.0, WATER_GLOW)
-			var d := float(PixelArt.GLOW_SIZE)
-			w.scale = Vector2(rect.size.x / d * 1.1, rect.size.y / d * 1.9)
-			w.set_meta("ph", float(water_glows.size()) * 2.1)
-			night_layer.add_child(w)
-			water_glows.append(w)
+			water.append(p.rect)
+	night_veil.build(cfg.get("lights", []), water)
 	_sync_lantern_glows()
 
-func _make_glow(pos: Vector2, scl: float, tint: Color) -> Sprite2D:
-	var g := Sprite2D.new()
-	g.texture = PixelArt.glow_texture()
-	g.position = pos
-	g.scale = Vector2(scl, scl)
-	g.modulate = tint
-	g.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	g.material = _glow_material()
-	return g
-
-func _glow_material() -> CanvasItemMaterial:
-	if _glow_mat == null:
-		_glow_mat = CanvasItemMaterial.new()
-		_glow_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	return _glow_mat
-
-## 玩家挂的灯笼也要亮。增删之后整批重建：上限才 8 盏，
-## 比让一张光与一个设施精灵的数组永远对齐要省心。
+## 玩家挂的灯笼也要亮：把设施精灵里那些「lantern」的光心交给夜罩层。
+## 增删之后整批重建，本层只负责挑出位置，不懂光怎么画。
 func _sync_lantern_glows() -> void:
-	for g: Sprite2D in lantern_glows:
-		if is_instance_valid(g):
-			g.queue_free()
-	lantern_glows.clear()
-	if night_layer == null:
+	if night_veil == null:
 		return
-	var n := 0
+	var spots: Array = []
 	for sp: Sprite2D in facility_nodes:
 		if not is_instance_valid(sp) or String(sp.get_meta("fid")) != "lantern":
 			continue
-		var g := _make_glow(sp.position + Vector2(0, -8), LANTERN_GLOW_SCALE, LAMP_GLOW)
-		g.set_meta("ph", float(n) * 2.3)
-		night_layer.add_child(g)
-		lantern_glows.append(g)
-		n += 1
-
-## 一盏灯从暗到亮跟着天色走：夜罩最深压到 0.48（乘 0.55 时深夜只比白天暗一成五，
-## 看着像黄昏），光按 1.6 倍提前拉满，免得天黑透了灯还只有一半力气。
-## 白天夜色为 0，光就彻底熄干净。
-func _update_night(light: float, delta: float) -> void:
-	night_rect.color = Color(NIGHT_TINT, light * 0.78)
-	_glow_time += delta
-	var base := clampf(light * 1.6, 0.0, 1.0)
-	for g: Sprite2D in lamp_glows:
-		_flicker(g, base)
-	for g: Sprite2D in lantern_glows:
-		_flicker(g, base)
-	for g: Sprite2D in water_glows:
-		var breathe := 1.0 + 0.18 * sin(_glow_time * 0.9 + float(g.get_meta("ph")))
-		g.modulate.a = clampf(base * WATER_GLOW_ALPHA * breathe, 0.0, 1.0)
-
-func _flicker(g: Sprite2D, base: float) -> void:
-	var wobble := 1.0 - FLICKER_AMPLITUDE + FLICKER_AMPLITUDE * sin(
-			_glow_time * FLICKER_SPEED + float(g.get_meta("ph")))
-	g.modulate.a = clampf(base * LAMP_GLOW_ALPHA * wobble, 0.0, 1.0)
+		spots.append(sp.position + Vector2(0, -8))
+	night_veil.sync_lanterns(spots)
 
 func _process(delta: float) -> void:
 	if cfg.is_empty():
@@ -293,15 +211,18 @@ func _process(delta: float) -> void:
 		var surprise: Dictionary = GameManager.pending_surprise
 		GameManager.pending_surprise = {}
 		# 杂记是店里的事，不是谁在说话：一行飘过就行，别占住底部那条横带
-		var segs: Array = Story.segments(surprise)
+		var entry: Dictionary = surprise.get("entry", {})
+		var segs: Array = Story.segments(entry)
 		if not segs.is_empty():
 			_toast(String(segs[0]).strip_edges())
+			# 提示条这一格就是「玩家看见了」，已播与收藏的账在这里落
+			_tell(String(surprise.get("key", "")), entry, true)
 	spawn_acc += delta
 	if spawn_acc >= SPAWN_INTERVAL:
 		spawn_acc = 0.0
 		_try_spawn()
-	if night_rect:
-		_update_night(GameManager.night_light(), delta)
+	if night_veil:
+		night_veil.update_night(GameManager.night_light(), delta)
 	if _toast_left > 0.0:
 		_toast_left -= delta
 		if _toast_left <= 0.0:
@@ -496,7 +417,7 @@ func _build_pools(pool_rects: Array, _types: Array) -> void:
 		%PoolAreas.add_child(area)
 		_add_overlay_rect(rect, tint, rect.size)
 		# 容量 = 汤种基础位 + 池位等级赠送位，且不超过池子宽度容得下的位数
-		var by_width := maxi(1, int(rect.size.x / SLOT_MIN_WIDTH))
+		var by_width := GameData.width_slots(rect.size.x)
 		var cap := GameData.level_cap(type_id, GameManager.pool_level(GameManager.current_room, i), by_width)
 		var seats: Array = []
 		var all_seats: Array = cfg.get("seats", [])
@@ -562,7 +483,7 @@ func _build_dock() -> void:
 	# 放下与信都是一次性动作，不是状态，跟着按下态会一直亮着
 	dock_drop.toggle_mode = false
 	for b: Button in [dock_mail, dock_layout, dock_build, dock_expand, dock_demolish, dock_drop]:
-		GameManager.style_button(b)
+		UiTheme.style_button(b)
 	dock_mail.tooltip_text = "看来往客人留的信，读过之后风向才会生效"
 	dock_layout.tooltip_text = "叠层显示席位、地面块与出生点（F1）"
 	dock_build.tooltip_text = "挑一件设施摆进亮绿地面块（F2）"
@@ -646,7 +567,7 @@ func _build_palette() -> void:
 		# 三十六件光看名字认不出，缩略图按块折半所以仍是硬边像素
 		b.icon = PixelArt.facility_preview_texture(id)
 		b.add_theme_constant_override("icon_max_width", 40)
-		GameManager.style_button(b)
+		UiTheme.style_button(b)
 		b.pressed.connect(_select_build.bind(id))
 		box.add_child(b)
 		palette_buttons.append(b)
@@ -664,10 +585,11 @@ func _refresh_palette() -> void:
 		var fits := GameManager.room_fits(room_id, id)
 		var afford := GameManager.coins >= int(GameData.facility(id).cost)
 		b.disabled = not fits or not afford
+		var effect := GameManager.facility_effect_text(id)
 		if not fits:
-			b.tooltip_text = palette_descs[i] + "\n（本房间没有容得下它的空地）"
+			b.tooltip_text = palette_descs[i] + "\n" + effect + "\n（本房间没有容得下它的空地）"
 		else:
-			b.tooltip_text = palette_descs[i]
+			b.tooltip_text = palette_descs[i] + "\n" + effect
 
 func _toggle_build() -> void:
 	build_mode = not build_mode
@@ -792,7 +714,7 @@ func _build_expand() -> void:
 		info.add_theme_font_size_override("font_size", 18)
 		var btn := Button.new()
 		btn.add_theme_font_size_override("font_size", 18)
-		GameManager.style_button(btn)
+		UiTheme.style_button(btn)
 		btn.pressed.connect(_on_upgrade.bind(pi))
 		row.add_child(info)
 		row.add_child(btn)
@@ -832,23 +754,36 @@ func _refresh_expand() -> void:
 			expand_rows[pi].button.tooltip_text = "已达最高等级"
 		else:
 			var cost := GameManager.upgrade_cost(room_id, pi)
-			expand_rows[pi].button.text = "升级 %d" % cost
+			# 位子不是想买就有的：背景画死的坐垫会把容量顶住。
+			# 顶住的那一级只买收益与额度，按钮名字和说明都得照实改口
+			var gain := _seat_cap(pi, level + 1) - _seat_cap(pi, level)
+			var inc := int(round((GameData.level_income(level + 1) - GameData.level_income(level)) * 100.0))
+			var hint := "收益 +%d%%" % inc
+			var b_gain := GameData.level_budget(type_id, level + 1) - budget
+			if b_gain > 0:
+				hint = "单日额度 +%d · " % b_gain + hint
+			if gain > 0:
+				expand_rows[pi].button.text = "扩建 %d" % cost
+				expand_rows[pi].button.tooltip_text = "多 %d 个位 · %s" % [gain, hint]
+			else:
+				expand_rows[pi].button.text = "服务 %d" % cost
+				expand_rows[pi].button.tooltip_text = "位子已排满画好的坐垫，不加位 · %s" % hint
 			# 钱不够时不许 disabled：那一下点下去要告诉他差多少金币，而不是变成一颗死键
 			expand_rows[pi].button.disabled = false
-			expand_rows[pi].button.tooltip_text = "多 1 个位，收益与单日额度同步提升"
 
 ## 升级后按新等级重算容量，空出来的位立刻可以接待
 func _apply_pool_cap(pi: int) -> void:
 	var p: Dictionary = pools[pi]
-	var cap := GameData.level_cap(String(p.type),
-			GameManager.pool_level(String(GameManager.current_room), pi), int(p.by_width))
-	var seats: Array = p.get("seats", [])
-	if not seats.is_empty():
-		cap = mini(cap, seats.size())
-	p.cap = cap
+	p.cap = _seat_cap(pi, GameManager.pool_level(String(GameManager.current_room), pi))
 	var taken: Array = p.taken
-	while taken.size() < cap:
+	while taken.size() < p.cap:
 		taken.append(false)
+
+## 这一级在这条池子里真有几个位子：池宽闸与背景画死的坐垫数都算进来。
+## 容量落地与扩建说明共用这一个算式，玩家看到的多几位才是真多几位
+func _seat_cap(pi: int, level: int) -> int:
+	var p: Dictionary = pools[pi]
+	return GameData.seat_cap(String(p.type), level, int(p.by_width), (p.get("seats", []) as Array).size())
 
 func _on_upgrade(pi: int) -> void:
 	var room_id := String(GameManager.current_room)
@@ -899,7 +834,7 @@ func _build_story() -> void:
 	var btn := Button.new()
 	btn.text = "继续 ▸"
 	btn.add_theme_font_size_override("font_size", 18)
-	GameManager.style_button(btn)
+	UiTheme.style_button(btn)
 	btn.pressed.connect(_advance_line)
 	row.add_child(btn)
 	box.add_child(row)
@@ -965,10 +900,12 @@ func _modal_up() -> bool:
 	return (report_panel != null and report_panel.visible) \
 			or (mail_panel != null and mail_panel.visible)
 
-## 头顶气泡：自言自语与踩雷抱怨是环境音，不值得占掉整块对白卡
-func _bubble(g: Guest, text: String, glow := false) -> void:
+## 头顶气泡：自言自语与踩雷抱怨是环境音，不值得占掉整块对白卡。
+## 返回值说的是「这句贴上去没有」：被上一颗气泡或对白卡占住的那一次没演成，
+## 调用方凭它决定要不要把这条记成播过读过
+func _bubble(g: Guest, text: String, glow := false) -> bool:
 	if text == "" or _bubble_left > 0.0 or (story_card != null and story_card.visible):
-		return
+		return false
 	_bubble_left = BUBBLE_SECONDS
 	var label := Label.new()
 	label.text = text
@@ -996,6 +933,19 @@ func _bubble(g: Guest, text: String, glow := false) -> void:
 			bubble_label = null
 			bubble_host = null
 		label.queue_free())
+	return true
+
+## 取词与落账是一件事的两半：pick_line 只负责挑，这一句真的贴到玩家眼前了
+## （气泡上了屏、对白卡进了队、提示条亮了）才把「播过」「读过」两笔记上。
+## 展示失败不动账，那条词下次还在——收集率 game 最怕玩家没看见、系统却替他记了读过。
+func _tell(key_id: String, entry: Dictionary, shown: bool) -> bool:
+	if shown and not entry.is_empty():
+		GameManager.commit_line(key_id, entry)
+	return shown
+
+## 一只客人的台词判定上下文：房间要带上，builtMin 那类条件读的就是这间屋摆了几件
+func _ctx_of(g: Guest) -> Dictionary:
+	return GameManager.story_ctx(g.species, g.affinity, String(GameManager.current_room))
 
 ## 气泡挪到 HUD 上就不再天然跟着客人走，只能每帧把宿主位置贴过来。
 ## 客人半路离店会被回收，那一种 bubble_host 已经不在树上，只能问一句还活着没
@@ -1028,59 +978,73 @@ func _nickname(sp: String) -> String:
 func _on_guest_seated(g: Guest) -> void:
 	if g.affinity >= 0:
 		return
-	var line := GameManager.pick_line("grumble", g.species, GameManager.story_ctx(g.species, g.affinity))
-	_bubble(g, _flat(line))
+	var line := GameManager.pick_line("grumble", g.species, _ctx_of(g))
+	_tell(g.species, line, _bubble(g, _flat(line)))
 
-## 半程：一句自言自语。稀有句由 pick_line 降过权，这里只管贴上去。
-## 五成概率改口点评屋里摆的件——玩家花金币布置，客人就得认得出来
+## 半程：一句自言自语。五成概率先说玩家摆的那件东西——花了金币布置的，客人就得认得出来；
+## 稀有句由 pick_line 降过权，这里只管贴上去。
 func _on_guest_murmured(g: Guest) -> void:
-	var line: Dictionary = _propchat_line(g) if randf() < 0.5 else {}
+	var key := g.species
+	var line := {}
+	var ids := _propchat_ids()
+	if not ids.is_empty() and randf() < 0.5:
+		key = String(ids.pick_random())
+		line = GameManager.pick_line("propchat", key, _ctx_of(g))
 	if line.is_empty():
-		line = GameManager.pick_line("murmur", g.species, GameManager.story_ctx(g.species, g.affinity))
-	_bubble(g, _flat(line), String(line.get("bubbleStyle", "")) == "glow")
+		key = g.species
+		line = GameManager.pick_line("murmur", key, _ctx_of(g))
+	_tell(key, line, _bubble(g, _flat(line), String(line.get("bubbleStyle", "")) == "glow"))
 
-## 从本房已摆的设施里随机挑一件说它的专属词：全说过就交回物种 murmur
-func _propchat_line(g: Guest) -> Dictionary:
+## 本房摆过的、且写了专属闲聊词的设施键：一件都没摆过就交回物种 murmur
+func _propchat_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for e: Dictionary in GameManager.room_facilities(String(GameManager.current_room)):
 		var fid := String(e.id)
 		if not ids.has(fid) and not Story.entries("propchat", fid).is_empty():
 			ids.append(fid)
-	if ids.is_empty():
-		return {}
-	ids.shuffle()
-	return GameManager.pick_line("propchat", ids[0], GameManager.story_ctx(g.species, g.affinity))
+	return ids
 
 ## 离店：合拍的那批才道别，顺手掷一次留信的骰子（信次日才到）
 func _on_guest_leaving(g: Guest) -> void:
-	var ctx := GameManager.story_ctx(g.species, g.affinity)
+	var ctx := _ctx_of(g)
 	# 踩雷的落位时已经抱怨过一句，合拍的才轮到道别——两头都给就是每只客人两句台词，
 	# 挂着玩的人根本点不过来。道别走头顶白字，底部那条横带留给玩家自己点开的内容
 	if g.affinity >= 0:
 		var bye := GameManager.pick_line("farewell", g.species, ctx)
-		if not bye.is_empty():
-			_bubble(g, _flat(bye))
+		_tell(g.species, bye, _bubble(g, _flat(bye)))
 	var letter := GameManager.post_letter(g.species, ctx)
 	if not letter.is_empty():
 		_toast("%s 留了一封信，明天送到" % g.guest_name)
 		_refresh_mail_badge()
 
-## 点击客人：闲聊。带风向的闲聊当场生效，不必等成信
+## 点击客人：闲聊。带风向的闲聊当场生效，但生效的前提是玩家真看见了这句话——
+## 对白卡堆满、这句没进队时，风向也不许偷偷改经营数字
 func _on_guest_chat(g: Guest) -> void:
 	# 进屋那句只给了个头：玩家点他就是想知道这位是谁，那完整的自我介绍该由这一下换出来
 	if not g.pending_intro.is_empty():
 		var intro: Dictionary = g.pending_intro
 		g.pending_intro = {}
-		_say(g.guest_name, _nickname(g.species), intro, true)
+		if _say(g.guest_name, _nickname(g.species), intro, true):
+			GameManager.commit_read(intro)
+			GameManager.mark_intro_seen(g.species)
 		return
-	var ctx := GameManager.story_ctx(g.species, g.affinity)
-	var line := GameManager.pick_line("chat", g.species, ctx)
+	var ctx := _ctx_of(g)
+	# 主线优先：这位心里那件事还没讲完，就先讲那件——日常闲话排在它后面。
+	# 链条停在哪儿，对白卡上那行「心事 n/5」就亮到哪儿，玩家看得见自己还差几趟
+	var arc := GameManager.arc_next(g.species, ctx)
+	var is_arc := not arc.is_empty()
+	var line := arc if is_arc else GameManager.pick_line("chat", g.species, ctx)
 	if line.is_empty():
 		# 没词也要给一下反馈，否则玩家会以为自己那根手指点空了
 		_toast("%s 没抬头，只往池子里挪了挪。" % g.guest_name)
 		return
-	GameManager.apply_hint(line.get("hint", {}), float(_profile_of(g.species).get("confidence", 0.8)))
-	_say(g.guest_name, _nickname(g.species), line, true)
+	var nick := _nickname(g.species)
+	if is_arc:
+		var prog := GameManager.arc_progress(g.species)
+		nick = "%s · 心事 %d/%d" % [nick, int(prog.done) + 1, int(prog.total)]
+	if _say(g.guest_name, nick, line, true):
+		GameManager.commit_line(g.species, line)
+		GameManager.apply_hint(line.get("hint", {}), float(_profile_of(g.species).get("confidence", 0.8)))
 
 ## 命中客人：脚边那一圈不算，身子中段才算——泡着的人只露出一颗头
 func _guest_at(pos: Vector2) -> Guest:
@@ -1117,8 +1081,10 @@ func _on_prop_tap(fid: String) -> void:
 	if line.is_empty():
 		_toast("%s 安安静静的，什么也没说。" % prop_name)
 		return
-	GameManager.apply_hint(line.get("hint", {}))
-	_say(prop_name, "", line, true)
+	# 读到了才生效：这句没进队（对白卡堆满）时，风向不许偷偷改经营数字
+	if _say(prop_name, "", line, true):
+		GameManager.commit_line(String(GameManager.PROP_BY_FACILITY.get(fid, "")), line)
+		GameManager.apply_hint(line.get("hint", {}))
 
 ## ---------------- 信箱 ----------------
 
@@ -1179,12 +1145,12 @@ func _build_mail() -> void:
 	box.add_child(row)
 	var back := Button.new()
 	back.text = "返回列表"
-	GameManager.style_button(back)
+	UiTheme.style_button(back)
 	back.pressed.connect(_mail_back)
 	row.add_child(back)
 	var close := Button.new()
 	close.text = "关上信箱"
-	GameManager.style_button(close)
+	UiTheme.style_button(close)
 	close.pressed.connect(_toggle_mail)
 	row.add_child(close)
 	add_child(mail_panel)
@@ -1194,7 +1160,7 @@ func _toggle_mail() -> void:
 	if mail_panel.visible:
 		_mail_open = -1
 		# 标题只有返回列表才会重置：连着开两次信箱会停在上一封信的名字上
-		mail_head.text = "通风信 · 已读 %d/%d 则" % [GameManager.story_log.size(), Story.line_count()]
+		mail_head.text = "通风信 · 已读 %d/%d 则" % [GameManager.story_log.size(), GameManager.total_lines()]
 		_refresh_mail()
 	_sync_mail_view()
 	# 信箱盖着的那段时间里攒下的台词，等它退场才轮到露面
@@ -1220,7 +1186,7 @@ func _refresh_mail() -> void:
 		b.text = "%s %s · %s" % [tag, String(m.title), _speaker(String(m.species))]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.disabled = not due
-		GameManager.style_button(b)
+		UiTheme.style_button(b)
 		b.pressed.connect(_open_mail.bind(i))
 		mail_list.add_child(b)
 
@@ -1238,7 +1204,7 @@ func _open_mail(i: int) -> void:
 
 func _mail_back() -> void:
 	_mail_open = -1
-	mail_head.text = "通风信 · 已读 %d/%d 则" % [GameManager.story_log.size(), Story.line_count()]
+	mail_head.text = "通风信 · 已读 %d/%d 则" % [GameManager.story_log.size(), GameManager.total_lines()]
 	_refresh_mail()
 	_sync_mail_view()
 
@@ -1308,7 +1274,7 @@ func _build_report() -> void:
 	var btn := Button.new()
 	btn.text = "开始新的一天"
 	btn.add_theme_font_size_override("font_size", 18)
-	GameManager.style_button(btn)
+	UiTheme.style_button(btn)
 	btn.pressed.connect(_close_report)
 	box.add_child(btn)
 	add_child(report_panel)
@@ -1316,6 +1282,7 @@ func _build_report() -> void:
 func _on_day_reported(report: Dictionary) -> void:
 	report_title.text = "第 %d 天 结算" % int(report.get("day", GameManager.day))
 	var guests_served := int(report.get("guests", 0))
+	var by_type: Dictionary = report.get("by_type", {})
 	var lines: Array[String] = [
 		"收入 %d 金币 · 接待 %d 位" % [int(report.get("income", 0)), guests_served],
 		"心愿达成 %d · 好评 %d / 差评 %d" % [int(report.get("wishes", 0)),
@@ -1323,10 +1290,19 @@ func _on_day_reported(report: Dictionary) -> void:
 		"平均 %.1f 星 · 声望 %+.1f" % [float(report.get("stars_avg", 0.0)),
 				float(report.get("rep_delta", 0.0))],
 	]
+	# 心愿奖励与摆件声望都是今天真进账的东西，别只藏在总额里：
+	# 玩家得能看出「这笔钱是谁给的、这点声望是哪件摆件带来的」
+	var wish_coin := int(by_type.get("wish", 0))
+	if wish_coin > 0:
+		lines.append("其中心愿奖励 %d 金币" % wish_coin)
+	var fame := float(report.get("fame", 0.0))
+	if fame > 0.0:
+		lines.append("声望与招牌进账 %+.1f" % fame)
 	var budgeted := false
 	var parts: Array[String] = []
-	var by_type: Dictionary = report.get("by_type", {})
 	for type_id: String in by_type:
+		if type_id == "wish":
+			continue          # 那不是池子，上面已经单列过
 		var used := int(by_type[type_id])
 		var quota := GameManager.budget_for_type(type_id)
 		var pool_name := String(GameData.pool(type_id).get("name", type_id))
@@ -1364,9 +1340,14 @@ func _close_report() -> void:
 	_sync_bottom_stack()
 
 func _try_spawn() -> void:
+	_spawn(_roll_species())
+
+## 进屋那一路的真身：找位、接线、记来访、播自我介绍。
+## 拆成独立函数只为验收能点名请一位客人进门——三十只里等那两位「有心事」的自己出现，
+## 跑上千帧也有整趟碰不上的一轮，那种闸等于在掷骰子。
+func _spawn(species_id: String) -> void:
 	if guests.size() >= MAX_GUESTS:
 		return
-	var species_id: String = _roll_species()
 	var choice := _best_slot(species_id)
 	if choice.is_empty():
 		return
@@ -1389,16 +1370,21 @@ func _try_spawn() -> void:
 	# 来访记账先于选词：when 里的 visitsMin / arcStage 读的就是这本账
 	var mem := GameManager.note_visit(species_id)
 	if not bool(mem.seen_intro):
-		var ctx := GameManager.story_ctx(species_id, guest.affinity)
-		var intro := GameManager.pick_line("intro", species_id, ctx)
+		var intro := GameManager.pick_line("intro", species_id, _ctx_of(guest))
 		if not intro.is_empty():
 			# 头一句从头顶白字冒出去：底部那条横带只放玩家自己点开的内容。
-			# 剩下的仍挂在这只客人身上，点他这一下才把整段介绍放完
+			# 贴上去了才算播过，剩下的挂在这只客人身上，点他这一下才放完整段；
+			# 那一句没贴成的话整段都不作废，留着等玩家点开来读
 			var segs: Array = Story.segments(intro)
-			if not segs.is_empty():
-				_bubble(guest, String(segs[0]).strip_edges())
-			GameManager.mark_intro_seen(species_id)
-			guest.pending_intro = {"segments": segs.slice(1)} if segs.size() > 1 else {}
+			if segs.is_empty():
+				guest.pending_intro = intro
+			elif _bubble(guest, String(segs[0]).strip_edges()):
+				_tell(species_id, intro, true)
+				GameManager.mark_intro_seen(species_id)
+				guest.pending_intro = {"id": String(intro.id), "segments": segs.slice(1)} \
+						if segs.size() > 1 else {}
+			else:
+				guest.pending_intro = intro
 	if GameManager.note_species(species_id):
 		_toast("图鉴新增：%s" % String(GameData.species(species_id).name))
 	_update_hud()
@@ -1506,12 +1492,18 @@ func _on_coin(amount: int, guest: Guest) -> void:
 			"+%d" % amount, INCOME_TINT)
 	_update_hud()
 
+## 离店那一下的全部结算都从 GameManager.settle_guest 出来：钱、声望、当日账本。
+## 视图只负责把结果钉在屏幕上——原先在这里另抽一句通用点评，那句会和星级打架
 func _on_reviewed(guest: Guest, stars: int, wish_id: String, wish_done: bool) -> void:
-	var rep: float = GameManager.add_review(stars, stars >= 4, wish_done)
-	var pool_lines: Array = GameData.REVIEW_LINES if not guest.lounge else GameData.REVIEW_LINES_LOUNGE
-	var line: String = String(pool_lines.pick_random())
+	var settle := GameManager.settle_guest(stars, wish_id, wish_done)
+	var line := GameData.review_text(stars, guest.lounge, wish_done, guest.affinity, _count_peers(guest))
 	var wish_label: String = String(GameData.WISHES[wish_id].label)
-	_review_stamp(guest.guest_name, stars, line, rep, wish_label, wish_done)
+	_review_stamp(guest.guest_name, stars, line, float(settle.rep_delta), wish_label, wish_done)
+	var bonus := int(settle.wish_coin)
+	if bonus > 0:
+		# 心愿的金币单独飘一条：玩家刚看着他起身，这笔钱得看得见是谁给的
+		_float_text(guest.position + Vector2(0, guest.head_y() - FLOAT_LABEL_H - 22.0),
+				"+%d 心愿" % bonus, INCOME_TINT)
 	GameManager.save_game()
 	_update_hud()
 

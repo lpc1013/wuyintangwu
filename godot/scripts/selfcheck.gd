@@ -77,7 +77,7 @@ func _run_checks() -> int:
 			for dock_name: String in ["DockMail", "DockLayout", "DockBuild", "DockExpand",
 					"DockDemolish", "DockDrop"]:
 				var b := dock.get_node(dock_name) as Button
-				if b == null or b.custom_minimum_size.y < gm_node.TOUCH_BUTTON_HEIGHT:
+				if b == null or b.custom_minimum_size.y < UiTheme.TOUCH_BUTTON_HEIGHT:
 					dock_ok = false
 		if not dock_ok:
 			printerr("FAIL room ", room_id, " 顶栏按钮坞缺项或太矮")
@@ -97,10 +97,11 @@ func _run_checks() -> int:
 		if need > budget:
 			printerr("FAIL room ", room_id, " 顶栏最小宽度 ", "%.0f" % need, " 超出画布 ", budget)
 			failures += 1
-		# 夜里的暖光是运行时照着配置表长出来的：数量对不上就是 _build_glows 与 ROOMS 脱了钩。
+		# 夜里的暖光是运行时照着配置表长出来的：数量对不上就是 NightVeil 与 ROOMS 脱了钩。
 		# 只能走 get()——room 的静态类型是 Node，编译期看不见 room_view 的成员。
-		var lamps = room.get("lamp_glows")
-		var sheen = room.get("water_glows")
+		var veil = room.get("night_veil")
+		var lamps = null if veil == null else veil.get("lamp_glows")
+		var sheen = null if veil == null else veil.get("water_glows")
 		var want_lamps: int = gm_node.ROOMS[room_id].lights.size()
 		var want_sheen: int = 0 if gm_node.is_lounge(room_id) else want_pools
 		if lamps == null or sheen == null or lamps.size() != want_lamps or sheen.size() != want_sheen:
@@ -111,7 +112,7 @@ func _run_checks() -> int:
 			failures += 1
 		else:
 			# 玩家挂的纸灯笼也要跟着亮：加一盏就该多一圈光（数组是同一份，clear 不换引用）
-			var lanterns = room.get("lantern_glows")
+			var lanterns = veil.get("lantern_glows")
 			var before: int = lanterns.size()
 			room.call("_add_facility_node", "lantern", Vector2(140, 96))
 			if lanterns.size() != before + 1:
@@ -265,9 +266,9 @@ func _run_checks() -> int:
 					failures += 1
 				# 必须挂在 HUD 那一层：夜罩是 layer 5 的整片蓝，同一个画布里 z_index 给多高都压不过它
 				var hud: CanvasLayer = stamp.get_parent()
-				var veil: CanvasLayer = room.get("night_layer")
-				if hud == null or veil == null or int(hud.layer) <= int(veil.layer):
-					printerr("FAIL 点评条压不进夜罩之上: hud=", hud, " veil=", veil)
+				var veil_layer: CanvasLayer = room.get("night_veil")
+				if hud == null or veil_layer == null or int(hud.layer) <= int(veil_layer.layer):
+					printerr("FAIL 点评条压不进夜罩之上: hud=", hud, " veil=", veil_layer)
 					failures += 1
 				# 起点是从顶栏实际高度推出来的，不是写死的 46：顶栏加高不许把这条带压到底下
 				var top_bar: Control = room.get_node("HUD/TopBarBG")

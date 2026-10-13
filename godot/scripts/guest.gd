@@ -225,11 +225,17 @@ func _set_pose(pose: String) -> void:
 	if sprite.texture != tex:
 		sprite.texture = tex
 
-## 落位：下水的换泡汤姿态并浮起水波，茶室的盘坐到坐垫上
+## 落位：下水的换泡汤姿态并浮起水波，茶室的盘坐到坐垫上。
+## 停留窗口与产币节拍都吃房间设施的折率：放松把客人留得更久，效率让同一分钟多敲两下。
 func _take_seat() -> void:
 	state = State.STAY
-	stay_window = REST_MAX if lounge else SOAK_MAX
-	stay_left = randf_range(REST_MIN if lounge else SOAK_MIN, stay_window)
+	var room_id := String(slot.get("room", ""))
+	stay_window = (REST_MAX if lounge else SOAK_MAX) * GameManager.stay_power(room_id)
+	stay_left = randf_range((REST_MIN if lounge else SOAK_MIN) * GameManager.stay_power(room_id),
+			stay_window)
+	coin_every = (COIN_INTERVAL_REST if lounge else COIN_INTERVAL) \
+			* GameManager.tempo_power(room_id)
+	coin_left = coin_every
 	position = slot.pos
 	z_index = int(slot.water_y)
 	if lounge:
@@ -304,15 +310,15 @@ func _stay(delta: float) -> void:
 			ripple.queue_free()
 		_finish_walk()
 
-## 应得产币：物种小费为基数，契合度、席位等级、房间设施、心愿共同加成，再乘时段倍率
+## 应得产币：物种小费为基数，契合度、席位等级、房间配置共同加成，再乘时段倍率。
+## 心愿不在这里发钱：wish_done 要到起身离店才判定，在席倍率永远吃不到，
+## 达成奖励统一走 GameManager.settle_guest()。
 func _stay_income() -> int:
 	var pay := float(GameData.species(species).get("pay", 12))
 	var room_id := String(slot.get("room", ""))
 	var mult := GameManager.income_mult() * (1.0 + 0.35 * affinity)
 	mult *= GameManager.pool_income_mult(room_id, int(slot.get("pool", 0)))
 	mult *= GameManager.facility_bonus(room_id)
-	if wish_done:
-		mult *= 1.25
 	return maxi(1, int(round(pay / 6.0 * mult)))
 
 ## 产币池有单日上限，额度用完的这一拍就不再进账
@@ -333,7 +339,8 @@ func _evaluate_wish() -> bool:
 		"alone":
 			return peers == 0
 		"chat":
-			return peers >= 2
+			# 屋里热闹（社交够 3 点）时门槛从「同池另外两位」放到「一位」
+			return peers >= GameManager.chat_peers_needed(room_id)
 		"snack", "photo", "tea", "nap":
 			return true
 	return false

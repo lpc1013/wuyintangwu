@@ -10,7 +10,9 @@ var _hint: Label
 var _hint_left := 0.0
 
 func _ready() -> void:
-	GameManager.style_button(%BackButton)
+	# 案内图是挑房间的地方，不是店里：停钟，日期只在玩家真进了一间汤屋后才推进
+	GameManager.stop_sim()
+	UiTheme.style_button(%BackButton)
 	%BackButton.pressed.connect(GameManager.goto_title)
 	for room_id: String in GameManager.ROOMS:
 		var cfg: Dictionary = GameManager.ROOMS[room_id]
@@ -18,7 +20,7 @@ func _ready() -> void:
 		var button := Button.new()
 		button.text = String(cfg.label) if open else ("锁定 %s" % String(cfg.label))
 		button.custom_minimum_size = Vector2(132, 26)
-		GameManager.style_button(button)
+		UiTheme.style_button(button)
 		# 高度可能被 style_button 抬过，居中要按抬完的真实尺寸算
 		button.position = cfg.map_anchor - button.custom_minimum_size * 0.5
 		button.pressed.connect(_on_room_pressed.bind(room_id))
@@ -53,7 +55,7 @@ func _build_hud() -> void:
 	var c := GameManager.chapter_now()
 	_hud_label(HUD_TOP + 24.0, "第 %d 章「%s」 · %s · 文案 %d/%d" % [
 		GameManager.chapter + 1, String(c.name), GameManager.chapter_goal(),
-		GameManager.story_log.size(), Story.line_count()], Color(1.0, 0.88, 0.55, 1.0))
+		GameManager.story_log.size(), GameManager.total_lines()], Color(1.0, 0.88, 0.55, 1.0))
 
 func _hud_label(top: float, text: String, color: Color) -> Label:
 	var label := Label.new()

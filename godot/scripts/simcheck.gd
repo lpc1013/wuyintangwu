@@ -61,6 +61,25 @@ var mail_panel_opened := false
 var mail_read := false
 var mail_forecast := false
 var mail_closed := false
+## 心愿奖励的那笔金币有没有真的飘到玩家眼前（"+N 心愿"）：
+## 审计报告点名的死代码就是这条——倍率写在在席收益里却永远走不到，现在改成离店发奖
+var saw_wish_bonus := false
+## 结算面板压着的那一帧，时钟必须一动不动
+var hour_at_report := -1.0
+var clock_frozen_in_report := false
+## 对白卡堆满 / 气泡占用时触发新剧情：一句都不许多记账
+var phantom_read_blocked := false
+## 点评条上那句引文与星级是否同档（样本数 + 违例数）
+var review_text_samples := 0
+var review_text_bad := 0
+## 角色主线那一拍：真点一下客人，出来的必须是这条链的下一拍，而不是随手抽的闲聊
+var arc_beat_seen := false
+var arc_species := ""
+var arc_done := 0
+var arc_total := 0
+var arc_second_blocked := false
+## 有心事的客人在这段里出现过几次：为 0 就是样本没跑到，而不是接线跑通了
+var arc_candidates := 0
 
 func _process(_delta: float) -> bool:
 	frame += 1
@@ -80,9 +99,11 @@ func _process(_delta: float) -> bool:
 		gm.pool_income_today.clear()
 		gm.pool_levels.clear()
 		gm.memory.clear()
+		gm.seen_lines.clear()
 		gm.forecast.clear()
 		gm.mailbox.clear()
 		gm.story_log.clear()
+		gm.letters_read = 0
 		gm.chapter = 0
 		gm.pending_surprise = {}
 		gm.current_room = TARGET_ROOM
@@ -99,6 +120,9 @@ func _process(_delta: float) -> bool:
 	var gm: Node = root.get_node("GameManager")
 	## 结算弹窗会把整棵树暂停，模拟里扮演玩家点一下「开始新的一天」
 	if report_pending:
+		# 收线之前先验一句：结算面板压着的这一整帧，时钟一格都不许走
+		if not clock_frozen_in_report:
+			clock_frozen_in_report = absf(float(gm.hour) - hour_at_report) < 0.0001
 		report_pending = false
 		if current_scene.has_method("_close_report"):
 			current_scene._close_report()
@@ -115,10 +139,19 @@ func _process(_delta: float) -> bool:
 	if not intro_expanded and frame >= STORY_FRAME and frame % 24 == 0 \
 			and current_scene.has_method("_on_guest_chat"):
 		_drive_intro()
+	# 有心事的那两位什么时候进门没人知道，所以每一帧都扫一遍：一次点两下就够，别按 24 帧等
+	if not arc_beat_seen and frame >= STORY_FRAME and current_scene.has_method("_on_guest_chat"):
+		_drive_arc(gm)
 	if not saw_bubble:
 		# 气泡整层挪到 HUD 之后不再挂在客人身上，只能问那一层现在贴着谁
 		saw_bubble = current_scene.get("bubble_label") != null
 	_account_review(gm)
+	_watch_wish_bonus()
+	# 队列满载与气泡占用这两种「演不成」的时刻：验一次「没演成就不许记账」。
+	# 逐拍重试：客人们身上多半还挂着没播完的自我介绍，那种要留给 _drive_intro
+	if not phantom_read_blocked and frame >= STORY_FRAME + 60 and frame % 24 == 0 \
+			and current_scene.has_method("_on_guest_chat"):
+		_check_no_phantom_read(gm)
 	if frame % 20 == 0:
 		periods_seen[String(gm.period().id)] = true
 		var used := int(gm.pool_income_today.get("hot", 0))
@@ -272,6 +305,51 @@ func _drive_intro() -> void:
 				and String(current_scene.story_body.text) == want and g.pending_intro.is_empty()
 		return
 
+## 角色主线那一拍必须从真点击里长出来：链条写在表里、派发却没接上，
+## 上面那些 API 级断言会一路全绿，而店里永远听不到这段。
+## 只认「讲完一拍、第二拍还锁着时不许跳到第三拍」这一条现场证据。
+func _drive_arc(gm: Node) -> void:
+	for g: Node2D in get_nodes_in_group("guests"):
+		if g.position.y - 36.0 <= 60.0:
+			continue
+		var sp := String(g.species)
+		if StoryArc.entries(sp).is_empty():
+			continue
+		var beat: Dictionary = gm.arc_next(sp,
+				gm.story_ctx(sp, g.affinity, String(gm.current_room)))
+		if beat.is_empty():
+			continue
+		arc_candidates += 1
+		var want := String((beat.get("segments", []) as Array)[0]).strip_edges()
+		var spot := g.position + Vector2(0, -36)
+		_clear_lines()
+		# 生客身上还挂着没播完的自我介绍：那一拍先留给「补全介绍」那条断言，别抢他的样本；
+		# 介绍到手之后再回来点第二下，轮到心事
+		if not g.pending_intro.is_empty():
+			if not intro_expanded:
+				continue
+			_click(spot)
+			_clear_lines()
+		_click(spot)
+		if not bool(current_scene.story_showing) or String(current_scene.story_body.text) != want:
+			return
+		arc_beat_seen = true
+		arc_species = sp
+		arc_done = int(gm.arc_progress(sp).done)
+		arc_total = int(gm.arc_progress(sp).total)
+		# 第二拍要等满三次来访：这位才进门，再点一下进度一格都不许多走，
+		# 也不许越过没讲的那件去掏后面的拍
+		_clear_lines()
+		_click(g.position + Vector2(0, -36))
+		arc_second_blocked = int(gm.arc_progress(sp).done) == arc_done \
+				and (not bool(current_scene.story_showing) \
+				or String(current_scene.story_body.text) != want)
+		return
+	# 一圈扫下来没有一位带心事的：那两位在三十只里抽签，等不到就是整趟白跑。
+	# 走真进门函数点名请一位——样本不该交给运气，接线照旧是真的。
+	if frame % 45 == 0:
+		current_scene._spawn("shib" if int(frame / 45.0) % 2 == 0 else "bear")
+
 func _drive_chat(gm: Node) -> void:
 	for g: Node2D in get_nodes_in_group("guests"):
 		# 头点太靠上的那几位会被顶栏吃掉，点击根本到不了房间
@@ -364,6 +442,7 @@ func _account_review(gm: Node) -> void:
 				else String((stamp as Label).text)
 		var at := text.find("声望 ")
 		if reviews - reviews_prev == 1 and at >= 0:
+			_account_review_band(text)
 			var got := rep - rep_prev
 			var shown := text.substr(at + 3).to_float()
 			if rep_pinned < 0.0:
@@ -376,14 +455,84 @@ func _account_review(gm: Node) -> void:
 				# 星级就印在条上，顺手量一下「按星级自己算」会印什么：两者必须不同，这格才咬得住
 				review_cap_ok = absf(got - float(text.count("★") - 2) * 2.0) > 0.02
 	# 封顶那一档日常跑动够不着（收钟才八十来分），只能借位造一次：摁到差 4 点封顶，
-	# 下一条五星就只能到账一部分。本窗口刚有点评落地时不摁，免得借位和到账混进同一个窗口
+	# 下一条五星就只能到账一部分。本窗口刚有点评落地时不摁，免得借位和到账混进同一个窗口。
+	# 窗口要从 900 帧前开：只有五星那一条点评能分辨「按星级算」与「实际到账」，
+	# 掐在最后 240 帧里常常一条五星都碰不上，闸就会随机瞎一次。
 	if rep_pinned < 0.0 and review_delta_ok and not review_cap_ok \
-			and reviews == reviews_prev and frame > LAST_FRAME - 240:
+			and reviews == reviews_prev and frame > LAST_FRAME - 900:
 		rep_pinned = rep
 		gm.reputation = float(GameManager.MAX_REPUTATION) - 4.0
 		print("SIM borrow rep ", rep_pinned, " -> ", gm.reputation, " @frame", frame)
 	rep_prev = rep
 	reviews_prev = reviews
+
+## 点评条那句话和它头上的星级必须同档：高星不许冒差评句，低星不许说「下次还来」。
+## 判据读的是这句出自哪一池（白名单），不是关键词黑名单——哪天新加一句好话也骗不过它。
+func _account_review_band(text: String) -> void:
+	var q1 := text.find("「")
+	var q2 := text.find("」")
+	if q1 < 0 or q2 <= q1:
+		return
+	var line := text.substr(q1 + 1, q2 - q1 - 1)
+	var stars := text.count("★")
+	var positive: Array = (GameData.REVIEW_ONSEN.positive as Array) \
+			+ (GameData.REVIEW_LOUNGE.positive as Array) + (GameData.REVIEW_WISH_DONE as Array)
+	var negative: Array = (GameData.REVIEW_ONSEN.negative as Array) \
+			+ (GameData.REVIEW_LOUNGE.negative as Array) + (GameData.REVIEW_CAUSE_WRONG_POOL as Array) \
+			+ (GameData.REVIEW_CAUSE_WISH_MISS as Array) + (GameData.REVIEW_CAUSE_CROWDED as Array)
+	review_text_samples += 1
+	if stars >= 4 and negative.has(line):
+		review_text_bad += 1
+		print("SIM 高星配了差评句 ", stars, " ", line)
+	elif stars <= 2 and positive.has(line):
+		review_text_bad += 1
+		print("SIM 低星配了好评句 ", stars, " ", line)
+
+## 心愿奖励那笔钱必须真的飘到玩家眼前。飘字只活一秒多，
+## 隔 20 帧采样必然漏，所以每帧问一次还挂在树上的那批。
+func _watch_wish_bonus() -> void:
+	if saw_wish_bonus:
+		return
+	for f: Dictionary in current_scene.get("floats"):
+		var l: Label = f.node
+		if l != null and String(l.text).ends_with("心愿"):
+			saw_wish_bonus = true
+			return
+
+## 演不成的台词一分账都不许记（审计 N-01）。两种「演不成」都要验：
+## 对白卡队列堆满 → _say 进不了队；头顶气泡被占 → _bubble 直接返回 false。
+## 这一条是拿缺陷当样本的：一旦谁把落账挪回 pick_line，这里立刻变红。
+func _check_no_phantom_read(gm: Node) -> void:
+	var target: Node2D = null
+	for g: Node2D in get_nodes_in_group("guests"):
+		var sp := String(g.species)
+		if String(g.state_name()) == "STAY" and (g.pending_intro as Dictionary).is_empty() \
+				and not Story.entries("chat", sp).is_empty():
+			target = g
+			break
+	if target == null:
+		print("SIM phantom: 这一帧没有一个点得着的客人，样本没跑到")
+		return
+	var sp := String(target.species)
+	# 先把这只的记忆建出来，再取基线：断言要量的是「有没有多记」
+	gm.story_ctx(sp, 0)
+	var log_before := int(gm.story_log.size())
+	var seen_before := (gm.memory[sp].seen as Array).size()
+	var cap: int = int(current_scene.get("STORY_QUEUE_MAX"))
+	current_scene.story_queue.clear()
+	for i in cap:
+		current_scene.story_queue.append({"who": "占位", "text": "占位%d" % i, "auto": false})
+	current_scene._on_guest_chat(target)
+	var chat_blocked: bool = int(gm.story_log.size()) == log_before \
+			and (gm.memory[sp].seen as Array).size() == seen_before
+	current_scene.story_queue.clear()
+	current_scene.set("_bubble_left", 2.0)
+	var bubble_before := int(gm.story_log.size())
+	current_scene._on_guest_murmured(target)
+	var bubble_blocked: bool = int(gm.story_log.size()) == bubble_before
+	current_scene.set("_bubble_left", 0.0)
+	phantom_read_blocked = chat_blocked and bubble_blocked
+	print("SIM phantom chat_blocked=", chat_blocked, " bubble_blocked=", bubble_blocked)
 
 ## 从 root 派发一次左键按下/抬起，让事件真的走完 _unhandled_input，而不是直接调方法。
 ## in_local_coords=true：headless 窗口只有 64×64，默认会按窗口坐标把落点放大到画布外。
@@ -399,6 +548,7 @@ func _click(pos: Vector2) -> void:
 func _on_report(report: Dictionary) -> void:
 	reports_seen += 1
 	last_report = report
+	hour_at_report = float(root.get_node("GameManager").hour)
 	var by_type: Dictionary = report.get("by_type", {})
 	var summed := 0
 	for type_id: String in by_type:
@@ -433,11 +583,15 @@ func _report(gm: Node) -> bool:
 		" pool_cap=", pool_cap, " hot_quota=", gm.budget_for_type("hot"),
 		" unlocked=", gm.unlocked_count(), "/", gm.room_count())
 	print("SIM story chat=", chat_logged, "/", chat_card_shown, "/", chat_card_cleared,
-		" intro=", intro_expanded, " bubble=", saw_bubble, " prop=", prop_read,
+			" intro=", intro_expanded, " bubble=", saw_bubble, " prop=", prop_read,
+			" wish_float=", saw_wish_bonus, " frozen=", clock_frozen_in_report,
+			" phantom=", phantom_read_blocked, " 点评同档=", review_text_samples, "/", review_text_bad,
 		" mail=", mail_panel_opened, "/", mail_read, "/", mail_forecast, "/", mail_closed,
 		" float=", saw_income_float, "/", saw_cost_float, " steam=", saw_steam, " review=", saw_review,
 		" untracked=", visits_untracked, " chapter=", gm.chapter + 1,
-		" read=", gm.story_log.size(), "/", Story.line_count())
+		" read=", gm.story_log.size(), "/", gm.total_lines(),
+			" arc_beat=", arc_beat_seen, " arc_cand=", arc_candidates,
+			" arc=", arc_species, " ", arc_done, "/", arc_total, " blocked=", arc_second_blocked)
 	var checks := {
 		"落位/离场闭环": saw_stay and saw_leave,
 		"顶栏按钮接通模式": dock_wired,
@@ -472,7 +626,13 @@ func _report(gm: Node) -> bool:
 		"读信之后风向才落地": mail_read and mail_forecast,
 		"每位客人都记了来访": visits_untracked == 0,
 		"主线随经营推进": gm.chapter > 0,
+		"点客人讲出角色主线那一拍（扫到候选 %d 帧）" % arc_candidates: arc_beat_seen,
+		"下一拍没到门槛就不许跳拍": arc_done == 1 and arc_second_blocked,
 		"收藏册读到过文案": gm.story_log.size() >= 5,
+		"心愿奖励飘进过眼前": saw_wish_bonus,
+		"结算面板期间时钟冻结": clock_frozen_in_report,
+		"演不成的台词不记账": phantom_read_blocked,
+		"点评引文与星级同档": review_text_samples >= 3 and review_text_bad == 0,
 	}
 	var ok := true
 	for key: String in checks:

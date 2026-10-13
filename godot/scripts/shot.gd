@@ -314,9 +314,14 @@ func _try_bubble() -> void:
 		if not g.has_method("state_name") or String(g.state_name()) != "STAY":
 			continue
 		var sp := String(g.species)
-		var line: Dictionary = gm.pick_line("murmur", sp, gm.story_ctx(sp, int(g.affinity)))
+		var ctx := gm.story_ctx(sp, int(g.affinity), String(gm.current_room))
+		var line: Dictionary = gm.pick_line("murmur", sp, ctx)
 		if story_kind == "propchat":
-			line = current_scene._propchat_line(g)
+			# 道具闲聊按设施 id 索引：逐件试到有一句可说为止
+			for pid: String in current_scene._propchat_ids():
+				line = gm.pick_line("propchat", String(pid), ctx)
+				if not line.is_empty():
+					break
 		var text := "\n".join(Story.segments(line))
 		# 低好感的生客常常一句都不该说：空的直接跳过，别把「截到了」当成截到了
 		if text.strip_edges() == "":

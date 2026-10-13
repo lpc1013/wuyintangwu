@@ -1,7 +1,8 @@
 extends Node
 ## 全局配置表与场景导航。房间布局数据驱动：新增房间只需在 ROOMS 加一条。
 
-const VIEWPORT_SIZE := Vector2i(896, 512)
+## 画布尺寸的唯一真相在 GameRules（落点边界要用它），这里只转发给 UI 用
+const VIEWPORT_SIZE := GameRules.VIEWPORT_SIZE
 const TITLE_BG := "res://assets/bg/title.png"
 const MAP_BG := "res://assets/bg/map-gate.png"
 
@@ -113,30 +114,6 @@ func room_kind(room_id: String) -> String:
 func is_lounge(room_id: String) -> bool:
 	return room_kind(room_id) == "lounge"
 
-## 抽一个本房间招待得起的心愿：心愿所需设施若在这间房里根本没有空地放下，
-## 就不该许给客人——否则这一位天生拿不到满星，玩家也无从补救。
-func pick_wish(room_id: String) -> String:
-	var ids: Array[String] = []
-	for id: String in GameData.WISHES:
-		var fits := true
-		for need: String in GameData.wish_needs(id):
-			if not room_fits(room_id, String(need)):
-				fits = false
-				break
-		if fits:
-			ids.append(id)
-	if ids.is_empty():
-		return "alone"
-	if is_lounge(room_id):
-		# 茶室是坐着消磨时间的地方，先只想喝茶/小睡/闲聊的那些
-		var seated: Array[String] = []
-		for id: String in ids:
-			if GameData.WISH_SEATED.has(id):
-				seated.append(id)
-		if not seated.is_empty():
-			return String(seated.pick_random())
-	return String(ids.pick_random())
-
 ## 昼夜时钟：hour 为 0..24 的浮点时数，按 GameData.DAY_SECONDS 走完一天
 var hour := 9.0
 var day := 1
@@ -160,28 +137,105 @@ signal day_reported(report: Dictionary)
 
 const SAVE_PATH := "user://save.json"
 const MAX_REPUTATION := 100.0
-const HUD_BOTTOM := 44.0            # 顶栏高度，设施不得压住
-const FACILITY_PAD := 6.0           # 设施之间的最小间距
-const PLACEMENT_GRID := 16.0        # 落点网格：家具底部中心对齐到格点才排得齐
-const FACILITY_INCOME_PER := 0.05   # 每件设施给本房间在席收益 +5%
-const FACILITY_INCOME_MAX := 0.30
+## ---------------- 经营算式住在 GameRules，这里只留同名转发 ----------------
+## 拆法： GameManager 管「状态」（哪间屋、有哪些件、剩多少钱），
+## GameRules 管「算式」（这个落点合不合法、这一列设施值多少收益）。
+## 下面这批同名常量与函数是给老调用方（room_view / guest / 三道闸）留的门，
+## 判据却只有一份——改 GameRules 一处就全变，不会再出现两份手抄互相打脸。
+const HUD_BOTTOM := GameRules.HUD_BOTTOM
+const FACILITY_OVERLAP_TOL := GameRules.FACILITY_OVERLAP_TOL
+const POOL_OVERLAP_TOL := GameRules.POOL_OVERLAP_TOL
+const PLACEMENT_GRID := GameRules.PLACEMENT_GRID
+const EFF_INCOME := GameRules.EFF_INCOME
+const EFF_STAY_PER := GameRules.EFF_STAY_PER
+const EFF_TEMPO_PER := GameRules.EFF_TEMPO_PER
+const EFF_TEMPO_MAX := GameRules.EFF_TEMPO_MAX
+const EFF_FAME_KEYS := GameRules.EFF_FAME_KEYS
+const EFF_FAME_PER := GameRules.EFF_FAME_PER
+const EFF_FAME_MAX := GameRules.EFF_FAME_MAX
+const EFF_SURPRISE_PER := GameRules.EFF_SURPRISE_PER
+const EFF_SURPRISE_MAX := GameRules.EFF_SURPRISE_MAX
+const EFF_SOCIAL_EASE := GameRules.EFF_SOCIAL_EASE
+const FACILITY_DUP_DECAY := GameRules.FACILITY_DUP_DECAY
+const FACILITY_INCOME_MAX := GameRules.FACILITY_INCOME_MAX
+const EFF_CHANNELS := GameRules.EFF_CHANNELS
+
+## 抽一个本房间此刻招待得起的心愿：除了几何上放不放得下，还要看玩家已经摆了多少件、
+## 以及「想聊天」这种需要同池真有第三位的条件——否则这一位天生拿不到满星，玩家也无从补救。
+func pick_wish(room_id: String) -> String:
+	var ids: Array[String] = []
+	for id: String in GameData.WISHES:
+		if wish_feasible(room_id, id):
+			ids.append(id)
+	if ids.is_empty():
+		return "alone"
+	if is_lounge(room_id):
+		# 茶室是坐着消磨时间的地方，先只想喝茶/小睡/闲聊的那些
+		var seated: Array[String] = []
+		for id: String in ids:
+			if GameData.WISH_SEATED.has(id):
+				seated.append(id)
+		if not seated.is_empty():
+			return String(seated.pick_random())
+	return String(ids.pick_random())
+
+## 心愿在这一间屋此刻还落不落得下
+func wish_feasible(room_id: String, wish_id: String) -> bool:
+	for need: String in GameData.wish_needs(wish_id):
+		var id := String(need)
+		# 已经摆好的那件不必再找空地：有了就是有了
+		if has_facility(room_id, id):
+			continue
+		if not room_has_free_spot(room_id, id):
+			return false
+	match wish_id:
+		"chat":
+			# 同池要凑得出「另外两位」（合计三位）；热闹的房间（社交≥3）放宽到另外一位
+			return max_pool_seats(room_id) >= chat_peers_needed(room_id) + 1
+	return true
+
+## 经营时钟只在玩家真的在店里的时候走。标题画面与案内图都不算「正在经营」，
+## 否则游戏开着不点开始，店里的日期也会自己跨过去。
+var sim_running := false
+
+func start_sim() -> void:
+	sim_running = true
+
+func stop_sim() -> void:
+	sim_running = false
 
 func _ready() -> void:
 	load_game()
 	_reset_day_ledger()
 
 func _process(delta: float) -> void:
+	if not sim_running:
+		return
 	hour += delta * 24.0 / GameData.DAY_SECONDS
 	if hour >= 24.0:
 		hour -= 24.0
+		# 声望与招牌在日结折进账：那一维效果本来就该换成店铺星级，而不只是面板上一行字
+		_grant_daily_fame()
 		_close_day()
 		day += 1
 		pool_income_today.clear()
 		_reset_day_ledger()
 		_roll_story_day()
 
+## 把摆件的声望效果记进今天的账本并落到店铺上，返回实际到账数
+func _grant_daily_fame() -> float:
+	var gain := daily_fame()
+	if gain <= 0.0:
+		return 0.0
+	var before := reputation
+	reputation = clampf(reputation + gain, 0.0, MAX_REPUTATION)
+	var got := reputation - before
+	today["fame"] = float(today.get("fame", 0.0)) + got
+	return got
+
 func _reset_day_ledger() -> void:
-	today = {"income": 0, "guests": 0, "wishes": 0, "good": 0, "bad": 0, "stars": 0, "by_type": {}}
+	today = {"income": 0, "guests": 0, "wishes": 0, "good": 0, "bad": 0, "stars": 0,
+			"fame": 0.0, "by_type": {}}
 	day_start_rep = reputation
 
 ## 跨天：把当日账本连同声望增减打包成结算快照并广播
@@ -228,6 +282,32 @@ func clock_text() -> String:
 
 func shop_stars() -> int:
 	return clampi(int(floor(reputation / 20.0)), 0, 5)
+
+## 离店结算的唯一出口：星级带来的声望、心愿的金币与声望、当日账本，全部从这里进。
+## 以前「心愿达成后在席收益 ×1.25」是第二个入口，可 wish_done 要到起身才判定，
+## 那一段永远走不到——奖励只在这一处发，玩家看到的和账上记的才是同一件事。
+func settle_guest(stars: int, wish_id: String, wish_done: bool) -> Dictionary:
+	var coin := 0
+	var fame := 0.0
+	if wish_done:
+		var w: Dictionary = GameData.WISHES.get(wish_id, {})
+		coin = int(w.get("coin", 0))
+		fame = float(w.get("fame", 0))
+		if coin > 0:
+			coins += coin
+			_ledger_add("income", coin)
+			# 收入里另记一格「wish」：日报的今日收入含这笔，账要按来源拆得开
+			var by_type: Dictionary = today.get("by_type", {})
+			by_type["wish"] = int(by_type.get("wish", 0)) + coin
+			today["by_type"] = by_type
+	var rep := add_review(stars, stars >= 4, wish_done)
+	if fame > 0.0:
+		var before := reputation
+		reputation = clampf(reputation + fame, 0.0, MAX_REPUTATION)
+		rep += reputation - before
+		# 心愿的声望可能把店铺星级顶上一档，章节门槛得再对一次表
+		advance_chapter()
+	return {"rep_delta": rep, "wish_coin": coin, "wish_fame": fame}
 
 ## 记一条点评，返回**实际**到账的声望增量：封顶之后再来五星也是 0，
 ## 现场反馈读的就是这个返回值，不能自己再乘一遍公式
@@ -280,81 +360,27 @@ func wall_limit_y(room_id: String) -> float:
 		return 140.0
 	return clampf(top - 12.0, HUD_BOTTOM + 16.0, 300.0)
 
-## 落点合法性：只依据房间配置与已建设施判定，headless 校验可直接复用
-func can_place(room_id: String, id: String, center: Vector2) -> bool:
+## 两块矩形的侵入深度：转发给 GameRules，判据只有那一份。
+static func overlap_depth(rect: Rect2, other: Rect2) -> float:
+	return GameRules.overlap_depth(rect, other)
+
+## 落点合法性：本间状态（金币、已建清单、墙带）交给纯算式去判。
+func can_place(room_id: String, id: String, center: Vector2, need_coin := true) -> bool:
 	var f := GameData.facility(id)
 	if f.is_empty():
 		return false
-	var cfg: Dictionary = ROOMS.get(room_id, {})
-	if cfg.is_empty():
-		return false
-	if coins < int(f.cost):
-		return false
-	var size := Vector2(GameData.facility_size(id))
-	var rect := Rect2(center - size * 0.5, size)
-	if rect.position.y < HUD_BOTTOM or rect.end.y > float(VIEWPORT_SIZE.y):
-		return false
-	if rect.position.x < 0.0 or rect.end.x > float(VIEWPORT_SIZE.x):
-		return false
-	for r: Rect2 in cfg.get("pools", []):
-		if rect.intersects(r.grow(-2.0)):
-			return false
-	for s: Vector2 in cfg.get("spawns", []):
-		if rect.has_point(s):
-			return false
-	for e: Dictionary in room_facilities(room_id):
-		var other := Vector2(GameData.facility_size(String(e.id)))
-		var orect := Rect2(Vector2(float(e.x), float(e.y)) - other * 0.5, other)
-		if rect.grow(-FACILITY_PAD).intersects(orect.grow(-FACILITY_PAD)):
-			return false
-	if bool(f.get("wall_only", false)):
-		# 墙上件不占地面 lot，只认墙带高度与单间数量
-		if center.y > wall_limit_y(room_id):
-			return false
-		return facility_count(room_id, id) < int(f.get("max_count", 99))
-	# 落地件：整只必须待在背景留空的地面块里，否则会压到画死的木桶毛巾
-	for l: Rect2 in cfg.get("lots", []):
-		if l.encloses(rect):
-			return true
-	return false
+	return GameRules.placement_ok(room_cfg(room_id), room_facilities(room_id), id, center,
+			not need_coin or coins >= int(f.cost),
+			facility_count(room_id, id), wall_limit_y(room_id))
 
 ## 落点吸附：以底部中心对齐格点，一排家具才站得齐
-func snap_center(id: String, center: Vector2) -> Vector2:
-	var half := Vector2(GameData.facility_size(id)) * 0.5
-	var bx: float = round(center.x / PLACEMENT_GRID) * PLACEMENT_GRID
-	var by: float = round((center.y + half.y) / PLACEMENT_GRID) * PLACEMENT_GRID
-	return Vector2(bx, by - half.y)
+static func snap_center(id: String, center: Vector2) -> Vector2:
+	return GameRules.snap_center(id, center)
 
 ## 只看几何：本房间是否存在一块容得下它的空地。忽略金币与已建设施的挤压，
 ## 供建造调色板把「这里根本放不下」的选项直接置灰，而不是让玩家反复点击试错。
 func room_fits(room_id: String, id: String) -> bool:
-	var f := GameData.facility(id)
-	if f.is_empty():
-		return false
-	var cfg: Dictionary = ROOMS.get(room_id, {})
-	if cfg.is_empty():
-		return false
-	var size := Vector2(GameData.facility_size(id))
-	if bool(f.get("wall_only", false)):
-		# 墙带不只是高度：底边还得落在 16 格上、顶边不压 HUD、下缘不碰池沿——
-		# 少算一条，调色板就会把其实挂不上的件点亮着骗人点一次红一次
-		for by in range(16, int(VIEWPORT_SIZE.y) + 1, 16):
-			var top := float(by) - float(size.y)
-			var center_y := top + float(size.y) * 0.5
-			if top < HUD_BOTTOM or center_y > wall_limit_y(room_id):
-				continue
-			var rect := Rect2(64.0, top, float(size.x), float(size.y))
-			var hit_pool := false
-			for r: Rect2 in cfg.get("pools", []):
-				if rect.intersects(r.grow(-2.0)):
-					hit_pool = true
-			if not hit_pool:
-				return true
-		return false
-	for l: Rect2 in cfg.get("lots", []):
-		if l.size.x >= size.x and l.size.y >= size.y:
-			return true
-	return false
+	return GameRules.room_fits(room_cfg(room_id), id, wall_limit_y(room_id))
 
 func buy_facility(room_id: String, id: String, center: Vector2) -> bool:
 	if not can_place(room_id, id, center):
@@ -382,9 +408,89 @@ func sell_facility(room_id: String, center: Vector2, grace := 0.0) -> int:
 			return refund
 	return 0
 
-## 已建设施给本房间在席收益的加成倍率
+## 已建设施给本房间在席收益的加成倍率：按每件的 eff 折算，同一件重复摆逐次减半。
+## 原来是「件数 ×5%」，于是六只最便宜的茶碗就能顶满 +30%，
+## 玩家学到的是「堆便宜货」而不是「按汤屋主题与客人需求布置」。
 func facility_bonus(room_id: String) -> float:
-	return 1.0 + minf(FACILITY_INCOME_MAX, FACILITY_INCOME_PER * room_facilities(room_id).size())
+	return 1.0 + facility_income_power(room_id)
+
+func facility_income_power(room_id: String) -> float:
+	return income_power_of(room_ids_of(room_id))
+
+## 一列设施 id 的在席收益强度：纯算式，校验脚本可以直接喂任意拼法，不必先把它摆进哪间屋
+static func income_power_of(ids: Array) -> float:
+	return GameRules.income_power_of(ids)
+
+## 一件设施的在席收益价值：只有 coin / joy 这两维真的换成钱
+static func income_value(id: String) -> float:
+	return GameRules.income_value(id)
+
+func room_ids_of(room_id: String) -> Array:
+	var ids: Array = []
+	for e: Dictionary in room_facilities(room_id):
+		ids.append(String(e.id))
+	return ids
+
+## 某一维（或几维）效果在一列设施里的合计，重复件同样按档减半
+static func eff_total_of(ids: Array, keys: Array) -> float:
+	return GameRules.eff_total_of(ids, keys)
+
+## 放松把客人留在池里的时间拉长（最多半倍）
+func stay_power(room_id: String) -> float:
+	return GameRules.stay_power(room_ids_of(room_id))
+
+## 效率把产币的节拍缩短（倍率小于 1，封顶 -25%）
+func tempo_power(room_id: String) -> float:
+	return GameRules.tempo_power(room_ids_of(room_id))
+
+## 社交合计：够 3 点就热闹到「一个人也聊得起来」
+func social_power(room_id: String) -> float:
+	return GameRules.social_power(room_ids_of(room_id))
+
+## 把一件设施的效果翻成人话，只报真起作用的通道。
+static func facility_effect_text(id: String) -> String:
+	return GameRules.effect_text(id)
+
+func chat_peers_needed(room_id: String) -> int:
+	return GameRules.chat_peers_needed(social_power(room_id))
+
+## 声望与招牌折成的日结进账（封顶 2 点，别让摆件把星级刷满）
+func daily_fame() -> float:
+	return GameRules.fame_gain(shop_eff_total_ids())
+
+## 探索把跨天撞上店内奇闻的几率抬起来
+func surprise_chance() -> float:
+	return SURPRISE_CHANCE + GameRules.surprise_bonus(shop_eff_total_ids())
+
+## 全店已建件 id 的清单：日结声望与奇闻概率看的是整间汤屋，不只眼下这一间
+func shop_eff_total_ids() -> Array:
+	var ids: Array = []
+	for room_id: String in ROOMS:
+		ids.append_array(room_ids_of(room_id))
+	return ids
+
+## 这条池子最多坐几位：汤种基础位、池宽、背景画死的坐垫三闸取最小。
+## 与 room_view 的容量用的是同一套算式，心愿判定才不会被另一份手抄骗到。
+func max_pool_seats(room_id: String) -> int:
+	var cfg: Dictionary = ROOMS.get(room_id, {})
+	var pool_list: Array = cfg.get("pools", [])
+	var types: Array = cfg.get("pool_types", [])
+	var all_seats: Array = cfg.get("seats", [])
+	var best := 0
+	for i in pool_list.size():
+		var type_id := String(types[i]) if i < types.size() else "hot"
+		var rect: Rect2 = pool_list[i]
+		var seats: Array = all_seats[i] if i < all_seats.size() else []
+		var n := GameData.seat_cap(type_id, pool_level(room_id, i),
+				GameData.width_slots(rect.size.x), seats.size())
+		best = maxi(best, n)
+	return best
+
+## 心愿所需的那件此刻还落不落得下：几何之外要躲开玩家已经摆好的那些件。
+## 金币不是门槛——买不买是玩家的选择，天生完不成才是设计事故。
+func room_has_free_spot(room_id: String, id: String) -> bool:
+	return GameRules.has_free_spot(room_cfg(room_id), room_facilities(room_id), id,
+			wall_limit_y(room_id), facility_count(room_id, id))
 
 ## 产币汤种的单日额度：按该池当前等级放大，扣减并返回实际放行数量，0 表示今日已达上限
 func take_pool_budget(type_id: String, want: int, room_id := "", pool_index := 0) -> int:
@@ -470,15 +576,20 @@ func budget_for_type(type_id: String) -> int:
 ## 每只动物的往来记忆：visits 累计来访、seen_intro 是否已自我介绍、
 ## arc_stage 主线阶段、seen 本只已播过的条目 id（同一条不重播）
 var memory := {}
+## 事件与道具台词的已播表：{key_id: [entry_id]}。这些键不是物种，不能塞进 memory——
+## 存档按名册过滤，塞进去等于下次读取就丢，玩家会看着同一桩奇闻从头重演
+var seen_lines := {}
 ## 风向情报：[{pool, trend, weight, until}]，读信或闲聊时写入，两天后过期
 var forecast: Array = []
 ## 信箱：离店时攒下的信，次日才送达；读过才把 hint 折进风向
 var mailbox: Array = []
-## 已读文案的收藏册：id 全局唯一，读到一条记一条，分母是 Story.line_count()
+## 已读文案的收藏册：id 全局唯一，读到一条记一条，分母是 total_lines()（生成表 + 主线）
 var story_log: Array = []
+## 拆过几封信：主线支线按它解锁「回信之后」的那一段
+var letters_read := 0
 ## 当前章节下标（0 起）；达成 CHAPTERS 门槛后前进，末章封顶
 var chapter := 0
-## 跨天掷出的惊喜事件台词，等下一间房里的玩家来读
+## 跨天掷出的惊喜事件台词，等下一间房里的玩家来读；{key: 事件键, entry: 条目}
 var pending_surprise: Dictionary = {}
 
 const FORECAST_TTL := 2
@@ -513,15 +624,32 @@ func arc_stage(visits: int) -> int:
 static func match_quality(aff: int) -> String:
 	return "perfect" if aff > 0 else ("wrong" if aff < 0 else "basic")
 
-## 台词判定上下文：条目 when 里出现的字段一律从这里取
-func story_ctx(sp: String, aff: int) -> Dictionary:
-	var m := _memory(sp)
-	return {"visits": int(m.visits), "arc_stage": int(m.arc_stage), "match": match_quality(aff),
-			"period": String(period().id), "first": not bool(m.seen_intro)}
+## 台词判定上下文：条目 when 里出现的字段一律从这里取。
+## room_id 给 builtMin 用（这段词要玩家真在这间屋里摆过东西才开口）
+## 只读名册、不开格：店内奇闻与道具的键不是物种，替它们在往来记忆里占一格，
+## 那一格会被存档校验按名册过滤掉，里面的重播记录就蒸发在两次会话之间（连跑 120 天才露头）。
+func story_ctx(sp: String, aff: int, room_id := "") -> Dictionary:
+	var m: Dictionary = memory.get(sp, {})
+	return {"visits": int(m.get("visits", 0)), "arc_stage": int(m.get("arc_stage", 0)),
+			"match": match_quality(aff), "period": String(period().id),
+			"first": not bool(m.get("seen_intro", false)),
+			"built": room_facilities(room_id).size() if room_id != "" else 0,
+			"letters_read": letters_read}
 
-## when 匹配：数据里目前只有 visitsMin / arcStage / match 三种键，
-## 认得的键逐条比对，认不出的键放行——将来网页版加了新条件也不至于让本作闭嘴。
+## when 里认得的条件下标：条件键一律要在这儿，拼错的键以前会静默放行，
+## 等于那段词的门槛凭空消失了还没人知道。校验脚本读的就是这张表。
+const KNOWN_WHEN_KEYS := ["visitsMin", "visitsMax", "arcStage", "match", "period", "first",
+	"builtMin", "lettersRead"]
+
+## when 匹配：认得的键逐条比对。开发构建遇到未知键当场报错，
+## 发行版只留一条警告——文案拼错不该把玩家的对白整段吞掉。
 static func when_ok(when: Dictionary, ctx: Dictionary) -> bool:
+	for key: String in when:
+		if not KNOWN_WHEN_KEYS.has(key):
+			if OS.is_debug_build():
+				push_error("未知的剧情条件键: " + key)
+			else:
+				push_warning("未知的剧情条件键: " + key)
 	if when.has("visitsMin") and int(ctx.visits) < int(when.visitsMin):
 		return false
 	if when.has("visitsMax") and int(ctx.visits) > int(when.visitsMax):
@@ -534,41 +662,96 @@ static func when_ok(when: Dictionary, ctx: Dictionary) -> bool:
 		return false
 	if bool(when.get("first", false)) and not bool(ctx.first):
 		return false
+	if when.has("builtMin") and int(ctx.built) < int(when.builtMin):
+		return false
+	if when.has("lettersRead") and int(ctx.letters_read) < int(when.lettersRead):
+		return false
 	return true
 
-## 选一条此刻条件成立、且本只还没播过的台词。选不到就返回空字典：
-## 剧情是经营之上的糖，任何一只动物没词可说都不该挡住玩法。
+## 选一条此刻条件成立、且这一位还没播过的台词；全播过就允许重播（宁可重播也别让店里没了声音）。
+## 这一步不改任何状态：选中不等于播过，更不等于读过——账要等真给玩家看了才落。
 func pick_line(channel_id: String, sp: String, ctx: Dictionary) -> Dictionary:
-	var m := _memory(sp)
-	var seen: Array = m.seen
-	var candidates: Array = []
+	var allowed: Array = []
 	for e: Dictionary in Story.entries(channel_id, sp):
 		var when: Dictionary = e.get("when", {})
 		if not when.is_empty() and not when_ok(when, ctx):
 			continue
-		if seen.has(String(e.id)):
-			continue
-		candidates.append(e)
-	if candidates.is_empty():
-		# 全播过就重置这一只的记忆，宁可重播也别让店里彻底没了声音
-		seen.clear()
+		allowed.append(e)
+	if allowed.is_empty():
 		return {}
+	var seen := _seen_store(sp)
+	var fresh: Array = []
+	for e: Dictionary in allowed:
+		if not seen.has(String(e.id)):
+			fresh.append(e)
+	# 抽光了也不清 seen：播过的记录是玩家的收藏，不该因为没新词就作废
+	var pool: Array = fresh if not fresh.is_empty() else allowed
 	var total := 0.0
 	var weights: Array = []
-	for e: Dictionary in candidates:
+	for e: Dictionary in pool:
 		var w := 1.0 if String(e.get("rarity", "common")) == "common" else RARE_WEIGHT
 		weights.append(w)
 		total += w
 	var roll := randf() * total
-	var chosen: Dictionary = candidates[candidates.size() - 1]
-	for i in candidates.size():
+	var chosen: Dictionary = pool[pool.size() - 1]
+	for i in pool.size():
 		roll -= float(weights[i])
 		if roll <= 0.0:
-			chosen = candidates[i]
+			chosen = pool[i]
 			break
-	seen.append(String(chosen.id))
-	_log_story(String(chosen.id))
 	return chosen
+
+## 主线那一拍：按顺序取「还没讲的第一拍」，讲到哪儿全看那条 seen 表。
+## 与闲聊池最大的分别是顺序不许乱：下一拍被 when 拦住时整条链就地停住，
+## 绝不跳过它去讲后面那一拍——跳过就等于把故事的因果拆没了。
+func arc_next(sp: String, ctx: Dictionary) -> Dictionary:
+	for e: Dictionary in StoryArc.entries(sp):
+		if _seen_store(sp).has(String(e.id)):
+			continue
+		var when: Dictionary = e.get("when", {})
+		if not when.is_empty() and not when_ok(when, ctx):
+			return {}
+		return e
+	return {}
+
+## 讲到第几拍了：给对白卡上那行「心事 2/5」用，玩家得知道自己还差几趟
+func arc_progress(sp: String) -> Dictionary:
+	var beats: Array = StoryArc.entries(sp)
+	var done := 0
+	for e: Dictionary in beats:
+		if _seen_store(sp).has(String(e.id)):
+			done += 1
+	return {"done": done, "total": beats.size()}
+
+## 文案总数：生成表之外还有主线这一层，收藏率的分母要一起算
+func total_lines() -> int:
+	return Story.line_count() + StoryArc.line_count()
+
+## 已播表落在哪：物种用它自己的往来记忆；店内奇闻、道具、道具闲聊的键不是物种，
+## 走另一张表，存档两侧才不会被名册过滤掉
+func _seen_store(key_id: String) -> Array:
+	if GameData.SPECIES.has(key_id):
+		return _memory(key_id).seen as Array
+	if not seen_lines.has(key_id):
+		seen_lines[key_id] = []
+	return seen_lines[key_id]
+
+## 台词真的贴到玩家眼前了才调用：seen 防重播，story_log 进收藏册。
+## 展示失败（对白卡堆满、气泡被占）不许调用，那条词下次还在。
+func commit_line(key_id: String, entry: Dictionary) -> void:
+	commit_seen(key_id, entry)
+	commit_read(entry)
+
+func commit_seen(key_id: String, entry: Dictionary) -> void:
+	var id := String(entry.get("id", ""))
+	if id == "":
+		return
+	var seen := _seen_store(key_id)
+	if not seen.has(id):
+		seen.append(id)
+
+func commit_read(entry: Dictionary) -> void:
+	_log_story(String(entry.get("id", "")))
 
 func _log_story(id: String) -> void:
 	if id == "" or story_log.has(id):
@@ -616,19 +799,30 @@ func forecast_text() -> String:
 
 ## 离店留信：只掷五成骰子。网页版的 hintRate 管的是「闲聊那句带不带风向」，
 ## 本作风向写在条目自己的 hint 里，所以档案有这个字段也不参与这里的判定。
-## 信先入账本，次日才算送达。
+## 信先入账本，次日才算送达。信箱满员时先腾掉最早拆过的那一封；
+## 十二封全没拆就干脆不收——玩家攒着的信不该被系统按顺序吃掉。
 func post_letter(sp: String, ctx: Dictionary) -> Dictionary:
 	if randf() >= LETTER_CHANCE:
+		return {}
+	if mailbox.size() >= MAILBOX_CAP and not _make_mail_room():
 		return {}
 	var e := pick_line("letter", sp, ctx)
 	if e.is_empty():
 		return {}
 	mailbox.append({"id": String(e.id), "species": sp, "title": String(e.get("title", "一封来信")),
 			"body": String(e.get("body", "")), "day": day + 1, "hint": e.get("hint", {}), "read": false})
-	while mailbox.size() > MAILBOX_CAP:
-		mailbox.pop_front()
 	save_game()
+	# 信已经写进信箱，这条 letter 台词就算用掉了；读没读要等 read_mail 才记进收藏册
+	commit_seen(sp, e)
 	return e
+
+## 腾出一个信箱位：只动已读的最旧一封，全未读时返回 false
+func _make_mail_room() -> bool:
+	for i in mailbox.size():
+		if bool(mailbox[i].read):
+			mailbox.remove_at(i)
+			return true
+	return false
 
 func due_mail() -> Array:
 	var list: Array = []
@@ -646,6 +840,7 @@ func read_mail(index: int) -> Dictionary:
 	if bool(m.read) or day < int(m.day):
 		return {}
 	m.read = true
+	letters_read += 1
 	var profile := Story.profile(String(m.species))
 	apply_hint(m.hint, float(profile.get("confidence", 0.8)))
 	_log_story(String(m.id))
@@ -666,7 +861,7 @@ func _roll_story_day() -> void:
 
 ## 惊喜台词先攒着：跨天也许正站在案内图，那儿没有对白卡可以播
 func _roll_surprise() -> void:
-	if not pending_surprise.is_empty() or randf() >= SURPRISE_CHANCE:
+	if not pending_surprise.is_empty() or randf() >= surprise_chance():
 		return
 	var ids: Array = Story.event_ids()
 	ids.shuffle()
@@ -674,7 +869,7 @@ func _roll_surprise() -> void:
 		# 逐个试：pick_line 会替我们把播光的事件跳过，比先算剩余条数省事
 		var e := pick_line("surprise", id, story_ctx(id, 0))
 		if not e.is_empty():
-			pending_surprise = e
+			pending_surprise = {"key": id, "entry": e}
 			return
 
 ## 网页版的道具按「动作」取名，本作按设施取名，两边就近对上同一件物：
@@ -712,130 +907,82 @@ func advance_chapter() -> void:
 	if moved:
 		chapter_advanced.emit(chapter)
 
-func save_game() -> void:
-	var data := {
+## 存档来源："" 表示这次是从新档开局，"backup" 表示主档坏了退到备份。
+## 界面与校验脚本都读它，别让「进度丢了」这件事只留在一条没人看的 push_warning 里。
+var save_source := ""
+
+func snapshot() -> Dictionary:
+	return {
+		"schema_version": SaveData.SCHEMA,
 		"coins": coins, "day": day, "hour": hour,
 		"reputation": reputation, "reviews_total": reviews_total,
 		"reviews_good": reviews_good, "wishes_done": wishes_done, "codex": codex,
 		"facilities": facilities, "pool_levels": pool_levels,
-		"memory": memory, "forecast": forecast, "mailbox": mailbox,
-		"story_log": story_log, "chapter": chapter,
+		"memory": memory, "seen_lines": seen_lines,
+		"forecast": forecast, "mailbox": mailbox,
+		"story_log": story_log, "letters_read": letters_read, "chapter": chapter,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(data))
+
+## 存档层要的上下文：房间名册与各项封顶。校验侧不认识场景，也不认识 UI。
+func save_ctx() -> Dictionary:
+	return {
+		"rooms": ROOMS.keys(),
+		"max_pool_level": max_pool_level(),
+		"max_reputation": MAX_REPUTATION,
+		"mailbox_cap": MAILBOX_CAP,
+		"max_chapter": Story.CHAPTERS.size() - 1,
+	}
+
+func save_game() -> bool:
+	return SaveData.write(SAVE_PATH, snapshot())
 
 func load_game() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
+	save_source = ""
+	var result := SaveData.read(SAVE_PATH, save_ctx())
+	save_source = String(result.source)
+	if not bool(result.ok):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return
-	var data: Dictionary = parsed
-	coins = int(data.get("coins", 0))
-	day = int(data.get("day", 1))
-	hour = float(data.get("hour", 9.0))
-	reputation = float(data.get("reputation", 20))
-	reviews_total = int(data.get("reviews_total", 0))
-	reviews_good = int(data.get("reviews_good", 0))
-	wishes_done = int(data.get("wishes_done", 0))
+	_apply_saved(result.data)
+
+func _apply_saved(data: Dictionary) -> void:
+	coins = int(data.coins)
+	day = int(data.day)
+	hour = float(data.hour)
+	reputation = float(data.reputation)
+	reviews_total = int(data.reviews_total)
+	reviews_good = int(data.reviews_good)
+	wishes_done = int(data.wishes_done)
 	codex.clear()
-	for s: Variant in data.get("codex", []):
+	for s: Variant in data.codex:
 		codex.append(String(s))
 	facilities.clear()
-	var saved: Dictionary = data.get("facilities", {})
-	for room_id: String in saved:
-		if not ROOMS.has(room_id):
-			continue
-		var list: Array = []
-		for e: Variant in saved[room_id]:
-			var item: Dictionary = e
-			if not item.has("id"):
-				continue
-			list.append({"id": String(item.id), "x": int(item.x), "y": int(item.y)})
-		facilities[room_id] = list
+	var saved_fac: Dictionary = data.facilities
+	for room_id: String in saved_fac:
+		facilities[room_id] = saved_fac[room_id]
 	pool_levels.clear()
-	var saved_levels: Dictionary = data.get("pool_levels", {})
+	var saved_levels: Dictionary = data.pool_levels
 	for room_id: String in saved_levels:
-		if not ROOMS.has(room_id):
-			continue
-		var list: Array = []
-		for v: Variant in saved_levels[room_id]:
-			list.append(clampi(int(v), 1, max_pool_level()))
-		pool_levels[room_id] = list
+		pool_levels[room_id] = saved_levels[room_id]
 		_ensure_levels(room_id)
-	_load_story(data)
-
-## 存档里的数字回读全是浮点，按各自的键还原成 int/bool；
-## 物种或汤种已经不存在的那条直接丢弃，免得拿着查不到表的键去选台词。
-func _load_story(data: Dictionary) -> void:
 	memory.clear()
-	var saved_mem: Dictionary = data.get("memory", {})
+	var saved_mem: Dictionary = data.memory
 	for sp: String in saved_mem:
-		if not GameData.SPECIES.has(sp):
-			continue
-		var raw: Dictionary = saved_mem[sp]
-		var seen_list: Array = []
-		for v: Variant in raw.get("seen", []):
-			seen_list.append(String(v))
-		memory[sp] = {"visits": int(raw.get("visits", 0)), "seen_intro": bool(raw.get("seen_intro", false)),
-				"arc_stage": int(raw.get("arc_stage", 0)), "seen": seen_list}
+		memory[sp] = saved_mem[sp]
+	seen_lines.clear()
+	var saved_seen: Dictionary = data.seen_lines
+	for key_id: String in saved_seen:
+		seen_lines[key_id] = saved_seen[key_id]
 	forecast.clear()
-	for e: Variant in data.get("forecast", []):
-		var item: Dictionary = e
-		var pool := String(item.get("pool", ""))
-		if not GameData.POOLS.has(pool):
-			continue
-		forecast.append({"pool": pool, "trend": String(item.get("trend", "up")),
-				"weight": float(item.get("weight", 1.0)), "until": int(item.get("until", day))})
+	for e: Variant in data.forecast:
+		forecast.append(e)
 	mailbox.clear()
-	for e: Variant in data.get("mailbox", []):
-		var item: Dictionary = e
-		var sp := String(item.get("species", ""))
-		if not GameData.SPECIES.has(sp):
-			continue
-		mailbox.append({"id": String(item.get("id", "")), "species": sp,
-				"title": String(item.get("title", "一封来信")), "body": String(item.get("body", "")),
-				"day": int(item.get("day", day)), "hint": item.get("hint", {}),
-				"read": bool(item.get("read", false))})
+	for e: Variant in data.mailbox:
+		mailbox.append(e)
 	story_log.clear()
-	for v: Variant in data.get("story_log", []):
+	for v: Variant in data.story_log:
 		story_log.append(String(v))
-	chapter = clampi(int(data.get("chapter", 0)), 0, Story.CHAPTERS.size() - 1)
-
-const BAR_COLOR := Color(0.09, 0.06, 0.13, 0.62)
-## 触摸端最小命中高度：896 宽的画面投到手机上，26 高的按钮只剩十来物理像素
-const TOUCH_BUTTON_HEIGHT := 36.0
-
-func style_button(button: Button) -> void:
-	var base := StyleBoxFlat.new()
-	base.bg_color = Color(0.09, 0.06, 0.13, 0.85)
-	base.border_color = Color(0.95, 0.8, 0.45, 1.0)
-	base.set_border_width_all(2)
-	base.set_corner_radius_all(0)
-	# 字号抬到 18 后顶栏一度撑爆 896：内边距从 6 收到 4 把宽度还给 HUD
-	base.set_content_margin_all(4)
-	var hover: StyleBoxFlat = base.duplicate()
-	hover.bg_color = Color(0.18, 0.11, 0.24, 0.92)
-	var pressed: StyleBoxFlat = base.duplicate()
-	pressed.bg_color = Color(0.04, 0.02, 0.07, 0.92)
-	# 默认主题在 disabled 下不画面板，锁定的按钮会糊在像素背景里，这里补一块暗板
-	var disabled: StyleBoxFlat = base.duplicate()
-	disabled.bg_color = Color(0.12, 0.10, 0.16, 0.72)
-	disabled.border_color = Color(0.46, 0.42, 0.52, 0.85)
-	button.add_theme_stylebox_override("normal", base)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("disabled", disabled)
-	button.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(1.0, 0.99, 0.92, 1.0))
-	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.58, 0.66, 1.0))
-	button.add_theme_font_size_override("font_size", 18)
-	if button.custom_minimum_size.y < TOUCH_BUTTON_HEIGHT:
-		button.custom_minimum_size.y = TOUCH_BUTTON_HEIGHT
+	letters_read = int(data.letters_read)
+	chapter = int(data.chapter)
 
 ## ---------------- 房间解锁 ----------------
 
