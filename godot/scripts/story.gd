@@ -1,7 +1,7 @@
 class_name Story
-## 叙事数据层：全部文案由 godot/tools/gen_story.py 从 Spring/index.html 的 STORY_DB 机械生成，
-## 要改剧情请改网页版再重跑生成脚本，别在这里手改——手改的那部分下次生成会被覆盖。
-## 生成命令：node godot/tools/_dump_story.js && python godot/tools/gen_story.py
+## 叙事数据层：全部文案由 godot/tools/gen_story.py 从 _story_dump.json 的 STORY_DB 机械生成，
+## dump 源自旧版网页 Spring/index.html（该目录 2026-10-13 已移除，不再可重建），
+## 且已落后本文件（缺 PROPCHAT 等后补块）：重跑会覆盖丢失，故默认勿重跑，改剧情直接改本文件。
 
 ## 网页版角色 → 本项目物种：狐狸/熊猫/老鼠/猫/小狗/兔子/猪/企鹅/青蛙/刺猬/熊/小鸡
 ## 其中 panda、mouse、pig、chick 是随叙事补进 GameData.SPECIES 的四只

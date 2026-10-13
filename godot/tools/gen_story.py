@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""把 godot/tools/_story_dump.json（由 _dump_story.js 从 Spring/index.html 求值得到）
+"""把 godot/tools/_story_dump.json（旧版网页 Spring/index.html 已于 2026-10-13 移除，
+该 dump 是当时由 _dump_story.js 求值固化的结案产物，现为文案唯一真相）
 生成 godot/scripts/story.gd。
 
 文案一律机械搬运，不做人工誊抄；顺带把网页版的两套词汇翻译成本项目的：
   角色 id → GameData.SPECIES 的物种 id（顶层键直接改写）
   pool-water-* → GameData.TYPES 的汤种 id（hint.pool 就地改写）
-重跑：node godot/tools/_dump_story.js && python godot/tools/gen_story.py
+重跑：python godot/tools/gen_story.py（dump 已固化；若要重建 dump 才需 node _dump_story.js，而那依赖已移除的 Spring/index.html）
 """
 import io
 import json
@@ -121,9 +122,9 @@ def main():
 	db = dump["STORY_DB"]
 	lines = [
 		"class_name Story",
-		"## 叙事数据层：全部文案由 godot/tools/gen_story.py 从 Spring/index.html 的 STORY_DB 机械生成，",
-		"## 要改剧情请改网页版再重跑生成脚本，别在这里手改——手改的那部分下次生成会被覆盖。",
-		"## 生成命令：node godot/tools/_dump_story.js && python godot/tools/gen_story.py",
+		"## 叙事数据层：全部文案由 godot/tools/gen_story.py 从 _story_dump.json 的 STORY_DB 机械生成，",
+		"## dump 源自旧版网页 Spring/index.html（该目录 2026-10-13 已移除，不再可重建），",
+		"## 且已落后本文件（缺 PROPCHAT 等后补块）：重跑会覆盖丢失，故默认勿重跑，改剧情直接改本文件。",
 		"",
 		"## 网页版角色 → 本项目物种：狐狸/熊猫/老鼠/猫/小狗/兔子/猪/企鹅/青蛙/刺猬/熊/小鸡",
 		"## 其中 panda、mouse、pig、chick 是随叙事补进 GameData.SPECIES 的四只",
